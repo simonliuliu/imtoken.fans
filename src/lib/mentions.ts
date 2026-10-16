@@ -5,7 +5,9 @@
 // （normalizeUsername 强制），但 Google 登录（0002_auth_profile_sync.sql 的 handle_new_user）
 // 直接拿 full_name 当 username，大小写不受控。转小写去匹配数据库会导致这类账号永远匹配不上，
 // 所以保留原始大小写，交给查询层做大小写不敏感匹配（ilike）。
-const MENTION_PATTERN = /@([a-z0-9_]{3,20})/gi;
+// Do not turn email addresses or the prefix of a longer identifier into mentions.
+// Keep the database notification matcher in 0026 aligned with this boundary.
+const MENTION_PATTERN = /(?<![a-z0-9_@.])@([a-z0-9_]{3,20})(?![a-z0-9_])/gi;
 
 export function extractMentionedUsernames(body: string): string[] {
   const usernames = new Set<string>();

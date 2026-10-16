@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { clearAllNotifications, markAllNotificationsRead, markNotificationRead } from "@/app/actions/notifications";
+import { mutateNotifications } from "@/app/actions/notifications";
 import { badgeInfo, type NotificationDetail, type NotificationItem } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
+import { Link } from "@/i18n/navigation";
+import { getSignInHref } from "@/lib/auth-navigation";
+import { AuthLoading } from "@/components/auth-loading";
 import { Avatar } from "@/components/avatar";
 import { LevelBadge } from "@/components/level-badge";
 import { levelTierName } from "@/lib/level";
@@ -110,117 +114,82 @@ function SystemIcon({ emoji, tone }: { emoji: string; tone: "brand" | "good" | "
   );
 }
 
-interface RawNotificationRow {
-  id: string;
-  type: NotificationItem["type"];
-  read_at: string | null;
-  created_at: string;
-  submission_id: string | null;
-  comment_id: string | null;
-  detail: NotificationDetail | null;
-  actor: { username: string | null; avatar_url: string | null } | null;
-  submission: { title: string; type: "product" | "idea" } | null;
-  comment: { body: string } | null;
+export function NotificationBell({ fullPage = false }: { fullPage?: boolean }) {
+  const { user, sessionEpoch, loading } = useAuth();
+  const identity = `${user?.id ?? ""}:${sessionEpoch}`;
+  if (loading) return fullPage ? <AuthLoading /> : null;
+  return <NotificationPanel key={identity} fullPage={fullPage} userId={user?.id ?? null} sessionEpoch={sessionEpoch} />;
 }
 
-export function NotificationBell() {
+function NotificationPanel({ fullPage, userId, sessionEpoch }: { fullPage: boolean; userId: string | null; sessionEpoch: number }) {
   const t = useTranslations("notifications");
   const tc = useTranslations("common");
   const locale = useLocale();
   const format = useFormatter();
   const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
-  const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  const fetchNotifications = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("notifications")
-      .select(
-        "id, type, read_at, created_at, submission_id, comment_id, detail, actor:profiles!actor_id(username, avatar_url), submission:submissions(title, type), comment:comments(body)"
-      )
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    const rows = (data ?? []) as unknown as RawNotificationRow[];
-    setItems(
-      rows.map((row) => ({
-        id: row.id,
-        type: row.type,
-        read_at: row.read_at,
-        created_at: row.created_at,
-        actor_username: row.actor?.username ?? null,
-        actor_avatar_url: row.actor?.avatar_url ?? null,
-        submission_id: row.submission_id,
-        submission_type: row.submission?.type ?? null,
-        submission_title: row.submission?.title ?? null,
-        comment_id: row.comment_id,
-        comment_preview: row.comment?.body ? row.comment.body.slice(0, 60) : null,
-        detail: row.detail ?? null,
-      }))
-    );
-  }, []);
-
-  useEffect(() => {
-    // 拉取通知 + 轮询是外部数据同步，不是从 props/state 派生的值，这里的 setState 就是预期行为。
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [open]);
-
-  const unreadCount = items.filter((n) => !n.read_at).length;
-
-  function handleClickItem(item: NotificationItem) {
-    setOpen(false);
-    if (!item.read_at) {
-      setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n)));
-      startTransition(() => {
-        markNotificationRead(item.id);
-      });
-    }
-    // 系统通知不挂在任何内容上，各自有自己的落地页（等级去个人主页、券去活动页……）。
-    const system = systemNotification(item.type, item.detail, t, locale);
-    if (system) {
-      router.push(system.href);
-      return;
-    }
-    if (item.submission_id && item.submission_type) {
-      const base = item.submission_type === "product" ? "/products" : "/ideas";
-      router.push(`${base}/${item.submission_id}${item.comment_id ? `#comment-${item.comment_id}` : ""}`);
-    }
+  const [unreadCount,setUnreadCount] = useState(0);
+  const [total,setTotal] = useState(0);
+  const [offset,setOffset] = useState(0);
+  const [loaded,setLoaded] = useState(false);
+  const [error,setError] = useState(false);
+  const [open,setOpen] = useState(fullPage);
+  const [isPending,startTransition] = useTransition();
+  const rootRef=useRef<HTMLDivElement>(null);
+  const alive=useRef(true);
+  const request=useRef(0);
+  const fetchNotifications=useCallback(async()=>{
+   if(!userId)return;
+   const version=++request.current;
+   try {
+    const {data,error}=await createClient().rpc("notification_read",{p_expected_user_id:userId,p_offset:offset});
+    if(!alive.current||version!==request.current)return;
+    if(error){setError(true);return;}
+    if(offset>0 && offset>=data.total){setOffset(Math.floor(Math.max(0,data.total-1)/20)*20);return;}
+    setItems(data.items);setUnreadCount(data.unread);setTotal(data.total);setError(false);setLoaded(true);
+   }catch{if(alive.current&&version===request.current)setError(true);}
+  },[userId,offset]);
+  useEffect(()=>{
+   alive.current=true;
+   // External database synchronization.
+   // eslint-disable-next-line react-hooks/set-state-in-effect
+   void fetchNotifications();
+   const interval=setInterval(()=>void fetchNotifications(),POLL_INTERVAL_MS);
+   return()=>{alive.current=false;clearInterval(interval);};
+  },[fetchNotifications,sessionEpoch]);
+  useEffect(()=>{
+   if(!open||fullPage)return;
+   function outside(e:MouseEvent){if(rootRef.current&&!rootRef.current.contains(e.target as Node))setOpen(false);}
+   function escape(e:KeyboardEvent){if(e.key==="Escape"){setOpen(false);rootRef.current?.querySelector("button")?.focus();}}
+   document.addEventListener("mousedown",outside);document.addEventListener("keydown",escape);
+   return()=>{document.removeEventListener("mousedown",outside);document.removeEventListener("keydown",escape);};
+  },[open,fullPage]);
+  function mutate(action:"read"|"all"|"clear",id?:string,href?:string){
+   if(!userId)return;
+   startTransition(async()=>{
+    try{const result=await mutateNotifications(userId,action,id);
+     if(!alive.current)return;
+     if(result.error){setError(true);return;}
+     if(action==="clear")setOffset(0);
+     await fetchNotifications();
+     if(href&&alive.current){setOpen(fullPage);router.push(href);}
+    }catch{if(alive.current)setError(true);}
+   });
   }
-
-  function handleMarkAllRead() {
-    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
-    startTransition(() => {
-      markAllNotificationsRead();
-    });
+  function handleClickItem(item:NotificationItem){
+   const system=systemNotification(item.type,item.detail,t,locale);
+   const href=system?.href ?? safeNotificationHref(item.href);
+   if(!item.read_at)mutate("read",item.id,href??undefined);
+   else if(href){setOpen(fullPage);router.push(href);}
   }
-
-  function handleClearAll() {
-    if (!window.confirm(t("clearConfirm"))) return;
-    setItems([]);
-    startTransition(() => {
-      clearAllNotifications();
-    });
-  }
-
+  function handleMarkAllRead(){mutate("all");}
+  function handleClearAll(){if(window.confirm(t("clearConfirm")))mutate("clear");}
+  if(!userId)return fullPage?<section><h1 className="mb-4 text-lg font-semibold text-ink">{t("title")}</h1><Link href={getSignInHref("/notifications",locale)} className="text-brand-ink underline">{t("signInRequired")}</Link></section>:null;
   return (
     <div ref={rootRef} className="relative">
-      <button
+      {!fullPage && <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         aria-label={t("aria")}
         className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-ink"
@@ -231,12 +200,12 @@ export function NotificationBell() {
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </button>
+      </button>}
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-line bg-surface shadow-lg">
+        <div className={fullPage ? "rounded-xl border border-line bg-surface" : "absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface shadow-lg"}>
           <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2.5">
-            <p className="text-sm font-semibold text-ink">{t("title")}</p>
+            {fullPage ? <h1 className="text-lg font-semibold text-ink">{t("title")}</h1> : <p className="text-sm font-semibold text-ink">{t("title")}</p>}
             <div className="flex items-center gap-3">
               {unreadCount > 0 && (
                 <button
@@ -263,15 +232,17 @@ export function NotificationBell() {
             </div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
+          {error && <p role="alert" className="p-3 text-sm text-risk">{t("loadError")} <button type="button" onClick={()=>void fetchNotifications()} className="underline">{t("retry")}</button></p>}
+          <div className={fullPage ? "" : "max-h-96 overflow-y-auto"}>
             {items.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-muted">{t("empty")}</p>
+              loaded && !error ? <p className="px-3 py-6 text-center text-sm text-muted">{t("empty")}</p> : null
             ) : (
               items.map((item) => {
                 const system = systemNotification(item.type, item.detail, t, locale);
-                const typeKey = TYPE_TEXT_KEY[item.type];
+                const typeKey = item.detail?.kind ?? TYPE_TEXT_KEY[item.type];
                 return (
                 <button
+                  disabled={isPending}
                   key={item.id}
                   type="button"
                   onClick={() => handleClickItem(item)}
@@ -314,6 +285,9 @@ export function NotificationBell() {
               })
             )}
           </div>
+          <div className="flex items-center justify-between gap-3 border-t border-line p-3 text-xs">
+           {fullPage ? <><button disabled={offset===0||isPending} onClick={()=>setOffset(Math.max(0,offset-20))}>{t("previous")}</button><span>{t("range",{start:total?offset+1:0,end:Math.min(offset+20,total),total})}</span><button disabled={offset+20>=total||isPending} onClick={()=>setOffset(offset+20)}>{t("next")}</button></> : <Link href="/notifications" onClick={()=>setOpen(false)} className="text-brand-ink">{t("viewAll")}</Link>}
+          </div>
         </div>
       )}
     </div>
@@ -339,4 +313,10 @@ function TrashIcon() {
       <path d="M14 11v6" />
     </svg>
   );
+}
+
+// Only routes produced by notification_read are accepted; no protocol or arbitrary URL.
+function safeNotificationHref(href?: string | null): string | null {
+ if(!href)return null;
+ return /^\/(?:products|ideas)\/[0-9a-f-]{36}(?:#comment-[0-9a-f-]{36})?$/.test(href)||/^\/community\/feedback\?category=wallet&idea=[0-9a-f-]{36}(?:&commentOffset=[0-9]+)?(?:#comment-[0-9a-f-]{36})?$/.test(href)?href:null;
 }

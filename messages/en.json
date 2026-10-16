@@ -861,7 +861,17 @@
     "badgeFallback": "New badge",
     "xpAdded": "An admin gave you {amount} XP",
     "xpRemoved": "An admin removed {amount} XP",
-    "xpBalance": " — {xp} XP now"
+    "xpBalance": " — {xp} XP now",
+    "follow_post": "published a new post",
+    "follow_comment": "posted a comment or reply",
+    "loadError": "Notifications are unavailable. Check database migrations and configuration, then retry.",
+    "sessionError": "Your account changed. Refresh and retry.",
+    "retry": "Retry",
+    "previous": "Previous",
+    "next": "Next",
+    "range": "{start}–{end} / {total}",
+    "viewAll": "View all notifications",
+    "signInRequired": "Sign in to view notifications."
   },
   "checkin": {
     "title": "Daily check-in",
@@ -1152,18 +1162,51 @@
     "suggestionType": "Product suggestion",
     "suggestionTypeHelp": "Explain the situation, proposed improvement, and expected benefit.",
     "fields": {
-      "section": "Community section", "category": "Post category", "module": "Product area", "title": "Title", "body": "Post body", "problem": "What went wrong", "situation": "Use case and current experience", "appVersion": "imToken / browser version", "device": "Device or platform", "steps": "Steps to reproduce", "expected": "Expected result", "actual": "What actually happened", "scenario": "Use case", "proposal": "Suggested improvement", "impact": "Who would benefit and how", "attachments": "Images or video"
+      "section": "Community section",
+      "category": "Post category",
+      "module": "Product area",
+      "title": "Title",
+      "body": "Post body",
+      "problem": "What went wrong",
+      "situation": "Use case and current experience",
+      "appVersion": "imToken / browser version",
+      "device": "Device or platform",
+      "steps": "Steps to reproduce",
+      "expected": "Expected result",
+      "actual": "What actually happened",
+      "scenario": "Use case",
+      "proposal": "Suggested improvement",
+      "impact": "Who would benefit and how",
+      "attachments": "Images or video"
     },
     "placeholders": {
-      "module": "For example: transfers, assets, or DApp browser", "appVersion": "For example: 2.18.0", "steps": "1. Open… 2. Select… 3. Observe…", "scenario": "When do you use this feature?", "proposal": "How would you improve it?", "impact": "Which people would benefit?"
+      "module": "For example: transfers, assets, or DApp browser",
+      "appVersion": "For example: 2.18.0",
+      "steps": "1. Open… 2. Select… 3. Observe…",
+      "scenario": "When do you use this feature?",
+      "proposal": "How would you improve it?",
+      "impact": "Which people would benefit?"
     },
-    "deviceOptions": { "ios": "iOS", "android": "Android", "browserExtension": "Browser extension", "other": "Other" },
+    "deviceOptions": {
+      "ios": "iOS",
+      "android": "Android",
+      "browserExtension": "Browser extension",
+      "other": "Other"
+    },
     "chooseOne": "Choose one",
     "uploadDeferred": "Image and video file uploads are not available in this form yet. Do not expose sensitive wallet information in screenshots or videos.",
     "privacyTitle": "Protect wallet security before sharing",
     "privacyBody": "Hide recovery phrases, private keys, passwords, full addresses, and sensitive transaction details. The community will never ask you to publish them.",
-    "previewSubmit": "Preview post", "editPreview": "Keep editing", "startOver": "Start over", "previewCreated": "Preview created on this page. Nothing has been published or saved.", "resetNotice": "Form cleared. Nothing has been published or saved.",
-    "titlePlaceholderPost": "For example: Notes on the hardware wallet connection flow", "titlePlaceholderFeedback": "Summarize the problem or suggestion", "bodyPlaceholder": "Add context, what you observed, and what you want to discuss. Use fictional examples and protect sensitive wallet information.", "bugDescriptionPlaceholder": "Describe the unexpected behavior and how it affects you.", "suggestionDescriptionPlaceholder": "Describe what feels difficult today and what you would improve.",
+    "previewSubmit": "Preview post",
+    "editPreview": "Keep editing",
+    "startOver": "Start over",
+    "previewCreated": "Preview created on this page. Nothing has been published or saved.",
+    "resetNotice": "Form cleared. Nothing has been published or saved.",
+    "titlePlaceholderPost": "For example: Notes on the hardware wallet connection flow",
+    "titlePlaceholderFeedback": "Summarize the problem or suggestion",
+    "bodyPlaceholder": "Add context, what you observed, and what you want to discuss. Use fictional examples and protect sensitive wallet information.",
+    "bugDescriptionPlaceholder": "Describe the unexpected behavior and how it affects you.",
+    "suggestionDescriptionPlaceholder": "Describe what feels difficult today and what you would improve.",
     "descriptionTooLong": "The complete feedback is {count} characters; the maximum is 5,000."
   },
   "community": {
@@ -1741,5 +1784,17 @@
     "feedback": "Product feedback",
     "product": "Community product",
     "idea": "Product idea (legacy)"
+  },
+  "following": {
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "signIn": "Sign in to follow",
+    "counts": "{followers} followers · Following {following}",
+    "subscriptions": "Activity notifications",
+    "posts": "Posts",
+    "comments": "Comments and replies",
+    "error": "Following is unavailable. Check database migrations and configuration, then retry.",
+    "list": "View following (latest 100)",
+    "empty": "Not following anyone yet."
   }
 }

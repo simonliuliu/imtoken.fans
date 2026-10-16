@@ -14,7 +14,7 @@ import { getSignInHref } from "@/lib/auth-navigation";
 
 export function SiteHeader() {
   const t = useTranslations("nav");
-  const { user, isAdmin, signOut, loading } = useAuth();
+  const { user, isAdmin, signOut, loading, sessionEpoch } = useAuth();
   const locale = useLocale();
   const pathname = usePathname();
   const menuRef = useRef<HTMLDetailsElement>(null);
@@ -40,8 +40,9 @@ export function SiteHeader() {
         <div className="fans-header-tools">
           <LanguageSwitcher />
           <Link href={submitHref} aria-label={t("submit")} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>
+          {!loading && user && <NotificationBell key={`${user.id}:${sessionEpoch}`} />}
           <div className="fans-desktop-account">
-            {loading ? <AuthLoading compact /> : user ? <><NotificationBell /><UserMenu name={user.name} avatarUrl={user.avatarUrl} isAdmin={isAdmin} onSignOut={signOut} /></> : <Link href={signInHref} className="fans-signin">{t("signIn")}</Link>}
+            {loading ? <AuthLoading compact /> : user ? <><UserMenu name={user.name} avatarUrl={user.avatarUrl} isAdmin={isAdmin} onSignOut={signOut} /></> : <Link href={signInHref} className="fans-signin">{t("signIn")}</Link>}
           </div>
           <details className="fans-mobile-menu" ref={menuRef} onKeyDown={(event) => {
             if (event.key === "Escape") { closeMenu(); menuRef.current?.querySelector("summary")?.focus(); }

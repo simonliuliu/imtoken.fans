@@ -43,7 +43,7 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
   const [page, setPage] = useState({ sort: feedSort, overview, offset: 0 });
   const offset = page.sort === feedSort && page.overview === overview ? page.offset : 0;
   const setOffset = (next: number) => setPage({ sort: feedSort, overview, offset: next });
-  const [commentOffset, setCommentOffset] = useState(0); const [reload, setReload] = useState(0);
+  const [commentOffset, setCommentOffset] = useState(() => { if (typeof window === "undefined") return 0; const value=Number(new URLSearchParams(window.location.search).get("commentOffset") ?? 0); return Number.isInteger(value) && value>=0 && value<=100000 ? Math.floor(value/50)*50 : 0; }); const [reload, setReload] = useState(0);
   const [editing, setEditing] = useState(false);
   const [commentBody, setCommentBody] = useState(""); const [replyTo, setReplyTo] = useState<FeedbackComment | null>(null);
   const [commentEdit, setCommentEdit] = useState<{ comment: FeedbackComment; body: string; mark: FeedbackMark; visibility: "published" | "hidden" } | null>(null);
@@ -100,6 +100,10 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
     const timer = setTimeout(async () => { const result = await readFeedback({ query: mergeQuery, sort: "oldest" }); if (!stale && result.ok && result.data.viewer.user_id === owner) setMergeChoices(result.data.posts.filter((post) => post.id !== active.id && !post.merge_id && post.visibility === "published")); }, 300);
     return () => { stale = true; clearTimeout(timer); };
   }, [active, admin, mergeQuery, owner]);
+  useEffect(() => {
+    if (!data || loading || !window.location.hash.startsWith("#comment-")) return;
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "center" });
+  }, [data, loading]);
   const mutate = async (action: Parameters<typeof writeFeedback>[0], payload: Record<string, unknown>): Promise<boolean> => {
     if (busy) return false; setBusy(true); setError(""); setErrorCode(""); setNotice("");
     try {

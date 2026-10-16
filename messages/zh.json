@@ -861,7 +861,17 @@
     "badgeFallback": "新徽章",
     "xpAdded": "管理员为你增加了 {amount} 经验值",
     "xpRemoved": "管理员扣除了 {amount} 经验值",
-    "xpBalance": "，当前 {xp} XP"
+    "xpBalance": "，当前 {xp} XP",
+    "follow_post": "发布了新内容",
+    "follow_comment": "发表了评论或回复",
+    "loadError": "消息服务暂不可用，请检查数据库迁移与配置后重试。",
+    "sessionError": "账号已变化，请刷新后重试。",
+    "retry": "重试",
+    "previous": "上一页",
+    "next": "下一页",
+    "range": "{start}–{end} / {total}",
+    "viewAll": "查看全部消息",
+    "signInRequired": "请登录后查看消息。"
   },
   "checkin": {
     "title": "每日签到",
@@ -1152,18 +1162,51 @@
     "suggestionType": "优化建议",
     "suggestionTypeHelp": "说明使用场景、改进方向和带来的帮助。",
     "fields": {
-      "section": "发布到板块", "category": "帖子分类", "module": "涉及的产品模块", "title": "标题", "body": "正文", "problem": "问题描述", "situation": "使用场景与当前体验", "appVersion": "imToken 版本 / 浏览器版本", "device": "设备或平台", "steps": "复现步骤", "expected": "预期表现", "actual": "实际表现", "scenario": "使用场景", "proposal": "建议的改进方式", "impact": "这项改进能带来什么帮助", "attachments": "图片或视频"
+      "section": "发布到板块",
+      "category": "帖子分类",
+      "module": "涉及的产品模块",
+      "title": "标题",
+      "body": "正文",
+      "problem": "问题描述",
+      "situation": "使用场景与当前体验",
+      "appVersion": "imToken 版本 / 浏览器版本",
+      "device": "设备或平台",
+      "steps": "复现步骤",
+      "expected": "预期表现",
+      "actual": "实际表现",
+      "scenario": "使用场景",
+      "proposal": "建议的改进方式",
+      "impact": "这项改进能带来什么帮助",
+      "attachments": "图片或视频"
     },
     "placeholders": {
-      "module": "例如：转账、资产、DApp 浏览器", "appVersion": "例如：2.18.0", "steps": "1. 打开…… 2. 点击…… 3. 观察到……", "scenario": "你在什么情况下使用这个功能？", "proposal": "你希望它如何改进？", "impact": "哪些用户会因此受益？"
+      "module": "例如：转账、资产、DApp 浏览器",
+      "appVersion": "例如：2.18.0",
+      "steps": "1. 打开…… 2. 点击…… 3. 观察到……",
+      "scenario": "你在什么情况下使用这个功能？",
+      "proposal": "你希望它如何改进？",
+      "impact": "哪些用户会因此受益？"
     },
-    "deviceOptions": { "ios": "iOS", "android": "Android", "browserExtension": "浏览器扩展", "other": "其他" },
+    "deviceOptions": {
+      "ios": "iOS",
+      "android": "Android",
+      "browserExtension": "浏览器扩展",
+      "other": "其他"
+    },
     "chooseOne": "请选择",
     "uploadDeferred": "当前表单尚未接入图片与视频文件上传；请勿在截图或视频中展示钱包敏感信息。",
     "privacyTitle": "分享前保护钱包安全",
     "privacyBody": "请遮挡助记词、私钥、密码、完整地址和交易截图中的敏感信息。社区不会要求你公开这些内容。",
-    "previewSubmit": "预览内容", "editPreview": "继续编辑", "startOver": "重新填写", "previewCreated": "已生成本页预览，尚未发布或保存。", "resetNotice": "表单已清空；内容仍未发布或保存。",
-    "titlePlaceholderPost": "例如：我对硬件钱包连接流程的观察", "titlePlaceholderFeedback": "用一句话概括问题或建议", "bodyPlaceholder": "说明背景、你的观察和希望交流的问题。请使用虚构示例并保护钱包敏感信息。", "bugDescriptionPlaceholder": "描述遇到的异常，以及它对你造成的影响。", "suggestionDescriptionPlaceholder": "说明目前哪里不顺手，以及你希望改善什么。",
+    "previewSubmit": "预览内容",
+    "editPreview": "继续编辑",
+    "startOver": "重新填写",
+    "previewCreated": "已生成本页预览，尚未发布或保存。",
+    "resetNotice": "表单已清空；内容仍未发布或保存。",
+    "titlePlaceholderPost": "例如：我对硬件钱包连接流程的观察",
+    "titlePlaceholderFeedback": "用一句话概括问题或建议",
+    "bodyPlaceholder": "说明背景、你的观察和希望交流的问题。请使用虚构示例并保护钱包敏感信息。",
+    "bugDescriptionPlaceholder": "描述遇到的异常，以及它对你造成的影响。",
+    "suggestionDescriptionPlaceholder": "说明目前哪里不顺手，以及你希望改善什么。",
     "descriptionTooLong": "完整反馈共 {count} 字，最多 5000 字。"
   },
   "community": {
@@ -1741,5 +1784,17 @@
     "feedback": "产品反馈",
     "product": "社区产品",
     "idea": "产品想法（旧版）"
+  },
+  "following": {
+    "follow": "关注",
+    "unfollow": "取消关注",
+    "signIn": "登录后关注",
+    "counts": "{followers} 位关注者 · 关注了 {following} 人",
+    "subscriptions": "动态通知",
+    "posts": "发帖",
+    "comments": "评论与回复",
+    "error": "关注服务暂不可用，请检查数据库迁移与配置后重试。",
+    "list": "查看关注的人（最近 100 位）",
+    "empty": "还没有关注任何人。"
   }
 }
