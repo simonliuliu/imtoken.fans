@@ -11,7 +11,7 @@ function readViewer(request) {
 let omitServerProfiles = false;
 let failProductList = false;
 const server = createServer(async (request, response) => {
-  response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:3000");
+  response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:4000");
   response.setHeader("Access-Control-Allow-Headers", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
   response.setHeader("Content-Type", "application/json");

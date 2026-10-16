@@ -47,7 +47,7 @@ test("支持、评分和评论共享登录入口并保留英文操作位置", as
   await expect(support).toBeVisible();
   for (const name of ["Sign in to support", "Sign in to rate and share a genuine product experience", "Sign in to comment"]) {
     const href = await page.getByRole("link", { name, exact: true }).getAttribute("href");
-    const link = new URL(href!, "http://127.0.0.1:3000");
+    const link = new URL(href!, "http://127.0.0.1:4000");
     expect(link.pathname).toBe("/en/auth/sign-in");
     expect(link.searchParams.get("redirect")).toBe(`/en/products/${PRODUCT_ID}#${name.endsWith("comment") ? "comments" : "product-rating"}`);
   }
@@ -100,7 +100,7 @@ test("缺少语言 cookie 的邮箱回调失败仍保留英文目标", async ({ 
 test("外部回跳地址不能跳离社区", async ({ page }) => {
   await page.goto("/en/auth/sign-in?redirect=" + encodeURIComponent("/\\example.test"));
   await signIn(page);
-  await expect(page).toHaveURL("http://127.0.0.1:3000/en");
+  await expect(page).toHaveURL("http://127.0.0.1:4000/en");
 });
 
 test("个人支持状态刷新完成前保持加载，不能误撤销已有支持", async ({ page, context }) => {

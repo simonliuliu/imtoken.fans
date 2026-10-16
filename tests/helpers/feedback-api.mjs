@@ -6,7 +6,7 @@ const seedId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 posts.set(seedId, { id: seedId, title: '示例反馈：保留未发布草稿', description: '本地回归示例，不写入正式数据库。', author_name: 'Test Reader', module: 'wallet', status: 'inbox', mark: 'none', visibility: 'published', version: 1, support_count: 0, supported: false, comment_count: 0, merge_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
 let loseNextResponse = false;
 const server = createServer(async (request, response) => {
-  response.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  response.setHeader('Access-Control-Allow-Origin', 'http://localhost:4000');
   response.setHeader('Access-Control-Allow-Headers', '*');
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   response.setHeader('Content-Type', 'application/json');
