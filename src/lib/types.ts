@@ -1,7 +1,7 @@
 // 对应 supabase/migrations/0003_moderation_and_cards.sql 里 submission_cards 视图的真实列。
 // 取代 mock-data.ts 里的 Submission 类型。
 
-export type SubmissionType = "product" | "idea";
+export type SubmissionType = "product" | "idea" | "post";
 export type SubmissionStatus = "pending" | "published" | "rejected";
 export type ProductPlatform = "web" | "ios" | "android" | "browser_extension" | "telegram" | "hardware" | "other";
 export type ProductPricing = "free" | "freemium" | "paid" | "open_source";
@@ -135,6 +135,10 @@ export interface SubmissionCard {
   maker_note: string | null;
   feedback_prompt: string | null;
   published_at: string | null;
+  community_like_count?: number;
+  community_section?: string;
+  legacy_slug?: string | null;
+  is_example?: boolean;
   support_count: number;
   rating_count: number;
   rating_average: number | null;
@@ -325,3 +329,7 @@ export function badgeInfo(
 
 // 后台「授予徽章」下拉菜单的选项来源：只列 grantable 的，保持声明顺序。
 export const GRANTABLE_BADGE_KEYS = Object.keys(BADGE_INFO).filter((key) => BADGE_INFO[key].grantable);
+
+export function submissionHref(row: { id: string; type: SubmissionType; community_section?: string | null; legacy_slug?: string | null }) {
+  return row.type === "post" ? `/community/${row.community_section}/${row.legacy_slug ?? row.id}` : `/${row.type === "product" ? "products" : "ideas"}/${row.id}`;
+}

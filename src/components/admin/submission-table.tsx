@@ -79,11 +79,11 @@ export function SubmissionTable({
               <TypePill type={s.type} />
               <StatusPill status={s.status} />
               <span className="font-mono text-[11px] text-faint">
-                {s.submitted_by_username ?? "未知用户"} · <TimeAgo iso={s.created_at} />
+                {s.is_example ? "示例作者" : s.submitted_by_username ?? "未知用户"} · <TimeAgo iso={s.created_at} />
               </span>
             </div>
             <Link
-              href={`/${s.type === "product" ? "products" : "ideas"}/${s.id}`}
+              href={`/${s.type === "post" ? `community/${s.community_section}/${s.legacy_slug ?? s.id}` : `${s.type === "product" ? "products" : "ideas"}/${s.id}`}`}
               className="mt-1 block truncate text-sm font-medium text-ink transition-colors hover:text-brand-ink"
               title={s.title}
             >

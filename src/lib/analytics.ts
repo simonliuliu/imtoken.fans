@@ -30,7 +30,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export function isTrackablePath(path: string): boolean {
   if (!path.startsWith("/")) return false;
-  return !IGNORED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  const canonical = withoutLocale(stripQuery(path));
+  return !IGNORED_PREFIXES.some((prefix) => canonical === prefix || canonical.startsWith(`${prefix}/`));
 }
 
 export interface NormalizedPath {
@@ -56,17 +57,19 @@ export interface NormalizedPath {
  */
 export function normalizePath(rawPath: string): NormalizedPath {
   const path = stripQuery(rawPath);
-  const segments = path.split("/").filter(Boolean);
+  const segments = withoutLocale(path).split("/").filter(Boolean);
+  const communityTarget = communityAnalyticsTarget(path);
 
   let contentId: string | null = null;
   const routeSegments = segments.map((segment, index) => {
     if (UUID_RE.test(segment)) {
-      // 只有产品页 / 点子页的 id 才是"内容"，其它 uuid（如果以后出现）不往 content_id 里塞。
-      if (index === 1 && (segments[0] === "products" || segments[0] === "ideas")) {
+      // 仅已识别的内容详情路由携带内容 UUID；社区目标仍由接收端核验公开性和归属。
+      if ((index === 1 && (segments[0] === "products" || segments[0] === "ideas")) || (index === 2 && communityTarget)) {
         contentId = segment.toLowerCase();
       }
       return "[id]";
     }
+    if (index === 2 && communityTarget) return "[id]";
     // 个人主页的用户名不是 uuid，得单独认一下，否则每个人的主页都会占一行。
     if (index === 1 && segments[0] === "u") return "[username]";
     return segment;
@@ -76,6 +79,22 @@ export function normalizePath(rawPath: string): NormalizedPath {
   if (route in ROUTE_LABEL) return { path, route, contentId };
   // 未收录的路由：内容 id 也不认（不是真的内容页），避免污染"热门内容"。
   return { path, route: OTHER_ROUTE, contentId: null };
+}
+
+const COMMUNITY_SECTIONS = ["safety", "feedback", "discussion", "activities"] as const;
+
+function withoutLocale(path: string): string {
+  // Public pages always carry one of the configured language prefixes.
+  return path.replace(/^\/(zh|en)(?=\/|$)/, "") || "/";
+}
+
+/** Only recognized board/permalink shapes can be resolved as community content. */
+export function communityAnalyticsTarget(rawPath: string): { section: string; identifier: string; isUuid: boolean } | null {
+  const segments = withoutLocale(stripQuery(rawPath)).split("/").filter(Boolean);
+  if (segments.length !== 3 || segments[0] !== "community" || !COMMUNITY_SECTIONS.some(section => section === segments[1])) return null;
+  const identifier = segments[2];
+  if (identifier.length > 80 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(identifier)) return null;
+  return { section: segments[1], identifier, isUuid: UUID_RE.test(identifier) };
 }
 
 function stripQuery(rawPath: string): string {
@@ -104,6 +123,17 @@ export const ROUTE_LABEL: Record<string, string> = {
   "/activities": "活动中心",
   "/submit": "提交内容",
   "/search": "搜索",
+  "/community/safety": "钱包安全",
+  "/community/safety/[id]": "钱包安全帖子",
+  "/community/feedback": "产品共创",
+  "/community/feedback/[id]": "产品共创帖子",
+  "/community/discussion": "综合交流",
+  "/community/discussion/[id]": "综合交流帖子",
+  "/community/activities": "活动区",
+  "/community/activities/[id]": "活动区帖子",
+  "/submit/post": "发布帖子",
+  "/submit/feedback": "提交反馈",
+  "/submit/product": "提交产品",
   "/profile": "个人设置",
   "/u/[username]": "用户主页",
   "/faq": "常见问题",

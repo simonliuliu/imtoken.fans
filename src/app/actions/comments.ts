@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { getLocale, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runModerationPipeline } from "@/lib/moderation/pipeline";
+import { scheduleCommentAiModeration } from "@/lib/moderation/pipeline";
 import { getCurrentProfile } from "@/lib/profile";
 import { isBlacklisted } from "@/lib/user-tags";
 import { hasPermission, requirePermission } from "@/lib/admin-guard";
@@ -37,7 +37,9 @@ export async function postComment(
   submissionId: string,
   body: string,
   pathname: string,
-  parentId?: string
+  parentId?: string,
+  expectedUser?: string,
+  requestId?: string
 ): Promise<{ error?: string; comment?: CommentWithAuthor }> {
   const t = await getTranslations("errors");
   const trimmed = body.trim();
@@ -46,7 +48,7 @@ export async function postComment(
   }
 
   const profile = await getCurrentProfile();
-  if (!profile) return { error: t("notSignedIn") };
+  if (!profile || profile.id !== expectedUser) return { error: t("notSignedIn") };
 
   if (profile.mutedUntil && new Date(profile.mutedUntil) > new Date()) {
     return { error: t("muted", { until: new Date(profile.mutedUntil).toLocaleString(await getLocale()) }) };
@@ -56,25 +58,13 @@ export async function postComment(
   }
 
   const supabase = await createClient();
-  const { data: inserted, error } = await supabase
-    .from("comments")
-    .insert({
-      submission_id: submissionId,
-      user_id: profile.id,
-      parent_id: parentId ?? null,
-      body: trimmed,
-    })
-    .select("id, submission_id, user_id, parent_id, body, created_at")
-    .single();
-
-  if (error || !inserted) return { error: error?.message ?? t("commentFailed") };
-
-  const status = await runModerationPipeline({
-    targetType: "comment",
-    targetId: inserted.id,
-    content: trimmed,
-    authorId: profile.id,
+  const { data: inserted, error } = await supabase.rpc("community_comment_create", {
+    p_expected: expectedUser, p_request: requestId, p_submission: submissionId,
+    p_body: trimmed, p_parent: parentId ?? null,
   });
+  if (error || !inserted) return { error: t("commentFailed") };
+  const status = inserted.status as "pending" | "published" | "rejected";
+  if (inserted.ai_pending && !inserted.replayed) scheduleCommentAiModeration({ targetType: "comment", targetId: inserted.id, content: trimmed, authorId: profile.id });
 
   // Published notifications are emitted transactionally by database triggers.
 
@@ -122,7 +112,9 @@ export async function postComment(
 // 先删后插同款套路，见 src/app/actions/votes.ts 的注释。
 export async function toggleCommentVote(
   commentId: string,
-  pathname: string
+  pathname: string,
+  expectedUser?: string,
+  desiredVote?: boolean
 ): Promise<{ error: string } | { voted: boolean }> {
   const t = await getTranslations("errors");
   const supabase = await createClient();
@@ -131,22 +123,10 @@ export async function toggleCommentVote(
   } = await supabase.auth.getUser();
   if (!user) return { error: t("notSignedIn") };
 
-  const { data: deleted, error: deleteError } = await supabase
-    .from("comment_votes")
-    .delete()
-    .eq("comment_id", commentId)
-    .eq("user_id", user.id)
-    .select("id");
-
-  if (deleteError) return { error: deleteError.message };
-
-  if (deleted && deleted.length > 0) {
-    revalidatePath(pathname);
-    return { voted: false };
-  }
-
-  const { error: insertError } = await supabase.from("comment_votes").insert({ comment_id: commentId, user_id: user.id });
-  if (insertError && insertError.code !== "23505") return { error: insertError.message };
+  if (user.id !== expectedUser || typeof desiredVote !== "boolean") return { error: t("notSignedIn") };
+  const { error } = await supabase.rpc("community_comment_like_write", { p_expected: expectedUser, p_comment: commentId, p_liked: desiredVote });
+  if (error) return { error: t("commentFailed") };
+  if (!desiredVote) { revalidatePath(pathname); return { voted: false }; }
 
   // 「评论被点赞」的经验给的是评论作者，不是点赞的人。
   // 幂等钥匙是 (评论, 点赞人) 的哈希：取消点赞再点回来不会重复加分（见 deterministicUuid）。
@@ -158,9 +138,11 @@ export async function toggleCommentVote(
 
 async function awardCommentUpvoteXp(commentId: string, voterId: string): Promise<void> {
   const admin = createAdminClient();
-  const { data: comment } = await admin.from("comments").select("user_id").eq("id", commentId).maybeSingle();
+  const { data: comment } = await admin.from("comments").select("user_id, status, deleted_at").eq("id", commentId).maybeSingle();
   // 自己给自己点赞不算——不然一个人就能无限给自己刷分。
-  if (!comment || comment.user_id === voterId) return;
+  if (!comment || comment.user_id === voterId || comment.status !== "published" || comment.deleted_at) return;
+  const { data: vote } = await admin.from("comment_votes").select("id").eq("comment_id", commentId).eq("user_id", voterId).maybeSingle();
+  if (!vote) return;
 
   await awardXpByRule({
     userId: comment.user_id,
@@ -175,11 +157,12 @@ async function awardCommentUpvoteXp(commentId: string, voterId: string): Promise
 // 其中作者只能置顶自己提交下面的评论——所以这里不能只查权限，还要比对 submitted_by。
 export async function toggleCommentPin(
   commentId: string,
-  pathname: string
+  pathname: string,
+  expectedUser?: string
 ): Promise<{ error: string } | { pinned: boolean }> {
   const t = await getTranslations("errors");
   const profile = await getCurrentProfile();
-  if (!profile) return { error: t("notSignedIn") };
+  if (!profile || profile.id !== expectedUser) return { error: t("notSignedIn") };
 
   const admin = createAdminClient();
   const { data: comment, error: commentError } = await admin
@@ -228,11 +211,12 @@ export async function toggleCommentPin(
 export async function reportComment(
   commentId: string,
   reason: CommentReportReason,
-  pathname: string
+  pathname: string,
+  expectedUser?: string
 ): Promise<{ error?: string }> {
   const t = await getTranslations("errors");
   const profile = await getCurrentProfile();
-  if (!profile) return { error: t("notSignedIn") };
+  if (!profile || profile.id !== expectedUser) return { error: t("notSignedIn") };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -257,10 +241,12 @@ export async function reportComment(
 export async function deleteComment(
   commentId: string,
   pathname: string,
-  reason?: string
+  reason?: string,
+  expectedUser?: string
 ): Promise<{ error?: string }> {
   const guard = await requirePermission("moderate_comments");
   if ("error" in guard) return { error: guard.error };
+  if (guard.profile.id !== expectedUser) return { error: (await getTranslations("errors"))("notSignedIn") };
 
   const result = await softDeleteContent({
     kind: "comment",

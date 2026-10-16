@@ -55,7 +55,10 @@ export function CommentForm({
 }) {
   const t = useTranslations("comments");
   const locale = useLocale();
-  const { user, loading } = useAuth();
+  const { user, loading, sessionEpoch } = useAuth();
+  const sessionRef = useRef(sessionEpoch);
+  useEffect(() => { sessionRef.current = sessionEpoch; return () => { sessionRef.current = -1; }; }, [sessionEpoch]);
+  const requestRef = useRef<{ body: string; id: string } | null>(null);
   const isLoggedIn = Boolean(user);
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -115,11 +118,17 @@ export function CommentForm({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await postComment(submissionId, body, pathname, parentId);
+      const startedEpoch = sessionEpoch;
+      if (!requestRef.current || requestRef.current.body !== body) requestRef.current = { body, id: crypto.randomUUID() };
+      let result: Awaited<ReturnType<typeof postComment>>;
+      try { result = await postComment(submissionId, body, pathname, parentId, user?.id, requestRef.current.id); }
+      catch { if (sessionRef.current === startedEpoch) setError(t("saveFailed")); return; }
+      if (sessionRef.current !== startedEpoch) return;
       if (result.error) {
         setError(result.error);
         return;
       }
+      requestRef.current = null;
       setBody("");
       // 新评论整行交给 CommentSection 先插进本地列表，用户不用等服务端往返就能看到自己发的内容；
       // 服务端 revalidate 追上后会按 id 去重（见 comment-section.tsx 的 merged）。
@@ -226,6 +235,22 @@ export function CommentItem({
   const [deletedReplyIds, setDeletedReplyIds] = useState<Set<string>>(() => new Set());
   const [collapsed, setCollapsed] = useState(false);
   const [page, setPage] = useState(1);
+  useEffect(() => {
+    const reveal = () => {
+      const target = window.location.hash.replace(/^#comment-/, "");
+      const index = replies.findIndex(reply => reply.id === target);
+      if (index < 0) return;
+      requestAnimationFrame(() => {
+        setCollapsed(false);
+        setPage(Math.floor(index / REPLIES_PER_PAGE) + 1);
+        requestAnimationFrame(() => document.getElementById(`comment-${target}`)?.scrollIntoView({ block: "center" }));
+      });
+    };
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [replies]);
+
 
   if (deleted) return null;
 
@@ -281,6 +306,8 @@ export function CommentItem({
               autoFocus
               onPosted={(newComment) => {
                 setReplyTo(null);
+                setCollapsed(false);
+                setPage(Math.ceil((visibleReplies.length + 1) / REPLIES_PER_PAGE));
                 onPosted?.(newComment);
               }}
             />
@@ -415,6 +442,7 @@ function CommentRow({
   const author = comment.author_display_name || comment.author_username || tc("deletedUser");
 
   const [voteCount, setVoteCount] = useState(comment.vote_count);
+  const { user } = useAuth();
   const [voted, setVoted] = useState(comment.viewer_has_voted);
   const pinned = comment.pinned_at !== null;
 
@@ -422,7 +450,7 @@ function CommentRow({
     if (!confirm(t("confirmDelete"))) return;
     setError(null);
     startTransition(async () => {
-      const result = await deleteComment(comment.id, pathname);
+      const result = await deleteComment(comment.id, pathname, undefined, user?.id);
       if (result.error) {
         setError(result.error);
         return;
@@ -434,7 +462,7 @@ function CommentRow({
   function handlePin() {
     setError(null);
     startTransition(async () => {
-      const result = await toggleCommentPin(comment.id, pathname);
+      const result = await toggleCommentPin(comment.id, pathname, user?.id);
       if ("error" in result) {
         setError(result.error);
         return;
@@ -450,7 +478,7 @@ function CommentRow({
     setVoted(nextVoted);
     setVoteCount((v) => v + (nextVoted ? 1 : -1));
     startTransition(async () => {
-      const result = await toggleCommentVote(comment.id, pathname);
+      const result = await toggleCommentVote(comment.id, pathname, user?.id, !voted);
       if ("error" in result) {
         setVoted(!nextVoted);
         setVoteCount((v) => v + (nextVoted ? -1 : 1));
@@ -601,6 +629,7 @@ function ReportMenu({
 }) {
   const t = useTranslations("comments");
   const locale = useLocale();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -618,7 +647,7 @@ function ReportMenu({
   function handleReport(reason: CommentReportReason) {
     setFeedback(null);
     startTransition(async () => {
-      const result = await reportComment(commentId, reason, pathname);
+      const result = await reportComment(commentId, reason, pathname, user?.id);
       setFeedback(result.error ?? t("reportThanks"));
       setTimeout(() => setOpen(false), 900);
     });

@@ -1,0 +1,13 @@
+import{db,ids,as,denied,check,out,post,comment,root}from'./community-database-base.mjs';import fs from'node:fs/promises';import assert from'node:assert/strict';
+const pid=await post();const pending=await comment(pid,'b','pending');const published=await comment(pid);const parent=await comment(pid);const child=await comment(pid,'a','published',parent);await db.query("update comments set status='rejected' where id=$1",[parent]);
+for(const n of['0029_community_post_type.sql','0030_real_community.sql'])await db.exec(await fs.readFile(root+'/supabase/migrations/'+n,'utf8'));
+const ins=(who,patch={})=>as('authenticated',who,()=>db.query('insert into comments(submission_id,user_id,status,body,parent_id) values($1,$2,$3,\'QA legacy comment\',$4) returning id',[pid,patch.user??ids[who],patch.status??'pending',patch.parent??null]));
+const vote=(who,cid)=>as('authenticated',who,()=>db.query('insert into comment_votes(comment_id,user_id) values($1,$2)',[cid,ids[who]]));
+await check('DB-first old product comment pending INSERT still works',async()=>assert((await ins('a')).rows[0].id));
+await check('legacy forged author or published bypass rejected',async()=>{await denied(()=>ins('a',{user:ids.b}));await denied(()=>ins('a',{status:'published'}));});
+await check('legacy blacklisted and muted comments denied',async()=>{await denied(()=>ins('blocked'));await denied(()=>ins('muted'));});
+await check('legacy reply to hidden ancestor denied',()=>denied(()=>ins('a',{parent:child})));
+await check('legacy vote on public comment succeeds then delete succeeds',async()=>{await vote('a',published);assert.equal((await as('authenticated','a',()=>db.query('delete from comment_votes where comment_id=$1 and user_id=$2 returning id',[published,ids.a]))).rows.length,1);});
+await check('legacy vote pending, hidden-chain, muted, blacklist rejected',async()=>{await denied(()=>vote('a',pending));await denied(()=>vote('b',child));await denied(()=>vote('muted',published));await denied(()=>vote('blocked',published));});
+await check('legacy comments on hidden target rejected',async()=>{await db.query("update submissions set status='rejected' where id=$1",[pid]);await denied(()=>ins('a'));});
+console.log(JSON.stringify(out,null,2));await db.close();if(out.some(r=>r.result==='FAIL'))process.exit(1);

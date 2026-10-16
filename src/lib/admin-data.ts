@@ -1,3 +1,4 @@
+import { submissionHref } from "@/lib/types";
 import "server-only";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -150,7 +151,7 @@ export async function getPendingQueueItems(limit?: number): Promise<QueueItem[]>
       return [
         {
           ...row,
-          preview: `[${s.type === "product" ? "产品" : "点子"}] ${s.title} — ${s.tagline}`,
+          preview: `[${s.type === "product" ? "产品" : s.type === "post" ? "社区帖" : "点子"}] ${s.title} — ${s.tagline}`,
           author_username: usernameMap.get(s.submitted_by) ?? null,
         },
       ];
@@ -365,6 +366,7 @@ export interface CommentReportRow {
   comment_author_username: string | null;
   comment_author_muted_until: string | null;
   submission_id: string | null;
+  submission_href: string | null;
   submission_type: SubmissionType | null;
   submission_title: string | null;
 }
@@ -427,7 +429,7 @@ export async function getCommentReports(filters: ReportFilters = {}): Promise<Pa
       ? admin.from("profiles").select("id, username, display_name, muted_until").in("id", profileIds)
       : Promise.resolve({ data: [] as { id: string; username: string | null; display_name: string | null; muted_until: string | null }[] }),
     submissionIds.length
-      ? admin.from("submissions").select("id, type, title").in("id", submissionIds)
+      ? admin.from("submissions").select("id, type, title, community_section, legacy_slug").in("id", submissionIds)
       : Promise.resolve({ data: [] as { id: string; type: SubmissionType; title: string }[] }),
   ]);
 
@@ -459,6 +461,7 @@ export async function getCommentReports(filters: ReportFilters = {}): Promise<Pa
         comment_author_id: comment ? comment.user_id : null,
         comment_author_username: author ? (author.display_name ?? author.username) : null,
         comment_author_muted_until: author ? author.muted_until : null,
+        submission_href: submission ? submissionHref(submission) : null,
         submission_id: comment ? comment.submission_id : null,
         submission_type: submission ? submission.type : null,
         submission_title: submission ? submission.title : null,
@@ -549,7 +552,7 @@ export async function getTrashItems(limit?: number): Promise<TrashItem[]> {
       kind: "submission" as const,
       id: s.id,
       preview: s.tagline,
-      title: `[${s.type === "product" ? "产品" : "点子"}] ${s.title}`,
+      title: `[${s.type === "product" ? "产品" : s.type === "post" ? "社区帖" : "点子"}] ${s.title}`,
       author_username: usernameMap.get(s.submitted_by) ?? null,
       deleted_at: s.deleted_at as string,
       deleted_by_username: s.deleted_by ? (usernameMap.get(s.deleted_by) ?? null) : null,
