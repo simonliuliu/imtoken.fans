@@ -1,14 +1,13 @@
 "use client";
 
-import { CommentToolbarIcon } from "@/components/comment-toolbar-icon";
 import Image from "next/image";
 import { FEEDBACK_CHANGED } from "@/lib/feedback";
 import { CoCreationFeedContext } from "@/components/co-creation-feed-context";
 import { CooperationPreview } from "@/components/cooperation-preview";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { DEMO_POSTS, SECTION_CATEGORIES, hasDemoSupport, compareDemoPopularity, demoSeedComments, type DemoComment, type CommunitySection, type DemoPost } from "@/lib/community-demo";
+import { SECTION_CATEGORIES, compareDemoPopularity, type CommunitySection, type DemoPost } from "@/lib/community-demo";
 import { LevelBadge } from "@/components/level-badge";
 import { Avatar } from "@/components/avatar";
 import { TokenPersonasCard } from "@/components/token-personas-card";
@@ -35,31 +34,26 @@ function SortTabs({ value, onChange }: { value: SortMode; onChange: (value: Sort
 function PostRow({ post }: { post: DemoPost }) {
   const t = useTranslations("community");
   const format = useFormatter();
-  return <Link href={postHref(post)} className="community-post-row"><div className="community-post-main"><div className="community-post-author"><Avatar name={t(`authors.${post.author}`)} className={`community-avatar community-avatar-${post.author}`} /><span>{t(`authors.${post.author}`)}</span><LevelBadge level={post.level} size="xs" showIcon={false} /><span className="community-post-location">· {t(`sections.${post.section}.name`)} › {t(`categories.${post.category}`)}</span></div><h2>{t(`posts.${post.id}.title`)}</h2><p className="community-post-excerpt">{t(`posts.${post.id}.excerpt`)}</p><div className="community-post-meta"><time dateTime={post.createdAt}>{format.dateTime(new Date(post.createdAt), { month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time><span>{t("commentCount", { count: post.commentCount })}</span><span>{t("likeCount", { count: post.likes })}</span>{hasDemoSupport(post) && <span>{t("supportCount", { count: post.votes })}</span>}</div></div></Link>;
+  return <Link href={postHref(post)} className="community-post-row"><div className="community-post-main"><div className="community-post-author"><Avatar name={post.author} className={`community-avatar community-avatar-${post.author}`} /><span>{post.author}</span>{post.isExample ? <span className="community-demo-label">{t("realExample")}</span> : <LevelBadge level={post.level} size="xs" showIcon={false} />}<span className="community-post-location">· {t(`sections.${post.section}.name`)} › {t(`categories.${post.category}`)}</span></div><h2>{post.title ?? t(`posts.${post.id}.title`)}</h2><p className="community-post-excerpt">{post.excerpt ?? t(`posts.${post.id}.excerpt`)}</p><div className="community-post-meta"><time dateTime={post.createdAt}>{format.dateTime(new Date(post.createdAt), { month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time><span>{t("commentCount", { count: post.commentCount })}</span><span>{t("likeCount", { count: post.likes })}</span></div></div></Link>;
 }
 
-function PopularPosts({ section, exclude }: { section?: CommunitySection; exclude?: string }) {
-  const t = useTranslations("community");
-  const posts = DEMO_POSTS.filter((post) => !(post.section === "feedback" && post.category === "wallet") && (!section || post.section === section) && post.id !== exclude).sort(compareDemoPopularity).slice(0, 5);
-  return <section className="community-panel"><div className="community-panel-heading"><h2>{t("popularTitle")}</h2></div><ol className="community-popular-list">{posts.map((post, index) => <li key={post.id}><span aria-hidden>{index + 1}</span><Link href={postHref(post)}>{t(`posts.${post.id}.title`)}</Link></li>)}</ol></section>;
-}
-
-function HomeSpotlight() {
+function HomeSpotlight({ posts }: { posts: DemoPost[] }) {
   const t = useTranslations("community");
   const [active, setActive] = useState(0);
   const [batch, setBatch] = useState(0);
-  const slides = SPOTLIGHT_IDS.map((id) => DEMO_POSTS.find((post) => post.id === id)!);
+  const slides = SPOTLIGHT_IDS.map((id) => posts.find((post) => post.id === id)).filter((post): post is DemoPost => Boolean(post));
   const post = slides[active];
   const banner = ["safety", "conversation", "builds"][active];
-  const ranked = [...DEMO_POSTS].sort(compareDemoPopularity);
-  const popular = Array.from({ length: 6 }, (_, index) => ranked[batch * 6 + index]);
+  if (!post) return null;
+  const ranked = [...posts].sort(compareDemoPopularity);
+  const popular = ranked.slice(batch * 6, batch * 6 + 6);
   function move(step: number) { setActive((value) => (value + step + slides.length) % slides.length); }
-  return <div className="community-spotlight"><section className={`community-carousel community-carousel-${active}`} role="region" aria-roledescription={t("carouselRole")} aria-label={t("carouselTitle")} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); } }}><div className="community-carousel-art"><Image src={`/images/community-banners/${banner}.png`} alt="" fill sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 480px" /></div><div className="community-carousel-top"><span>{t(`categories.${post.category}`)}</span></div><Link href={postHref(post)} className="community-carousel-link"><h1>{t(`posts.${post.id}.title`)}</h1><p>{t(`posts.${post.id}.excerpt`)}</p><span className="community-carousel-cta">{t("readMore")} <span aria-hidden>↗</span></span></Link><div className="community-carousel-controls"><button type="button" onClick={() => move(-1)} aria-label={t("previousSlide")}>←</button><div className="community-carousel-dots">{slides.map((slide, index) => <button type="button" key={slide.id} aria-label={t("goToSlide", { index: index + 1 })} aria-current={index === active ? "true" : undefined} onClick={() => setActive(index)}><span /></button>)}</div><span className="sr-only" aria-live="polite">{t("slidePosition", { index: active + 1, count: slides.length })}</span><button type="button" onClick={() => move(1)} aria-label={t("nextSlide")}>→</button></div></section><section className="community-panel community-home-popular"><div className="community-panel-heading"><h2>{t("popularTitle")}</h2><button type="button" onClick={() => setBatch((value) => 1 - value)}>{t("refreshPopular")}</button></div><ol className="community-popular-list">{popular.map((item, index) => <li key={item.id}><span aria-hidden>{batch * 6 + index + 1}</span><Link href={postHref(item)}>{t(`posts.${item.id}.title`)}</Link></li>)}</ol></section></div>;
+  return <div className="community-spotlight"><section className={`community-carousel community-carousel-${active}`} role="region" aria-roledescription={t("carouselRole")} aria-label={t("carouselTitle")} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); } }}><div className="community-carousel-art"><Image src={`/images/community-banners/${banner}.png`} alt="" fill sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 480px" /></div><div className="community-carousel-top"><span>{t(`categories.${post.category}`)}</span></div><Link href={postHref(post)} className="community-carousel-link"><h1>{post.title ?? t(`posts.${post.id}.title`)}</h1><p>{post.excerpt ?? t(`posts.${post.id}.excerpt`)}</p><span className="community-carousel-cta">{t("readMore")} <span aria-hidden>↗</span></span></Link><div className="community-carousel-controls"><button type="button" onClick={() => move(-1)} aria-label={t("previousSlide")}>←</button><div className="community-carousel-dots">{slides.map((slide, index) => <button type="button" key={slide.id} aria-label={t("goToSlide", { index: index + 1 })} aria-current={index === active ? "true" : undefined} onClick={() => setActive(index)}><span /></button>)}</div><span className="sr-only" aria-live="polite">{t("slidePosition", { index: active + 1, count: slides.length })}</span><button type="button" onClick={() => move(1)} aria-label={t("nextSlide")}>→</button></div></section><section className="community-panel community-home-popular"><div className="community-panel-heading"><h2>{t("popularTitle")}</h2><button type="button" onClick={() => setBatch((value) => 1 - value)}>{t("refreshPopular")}</button></div><ol className="community-popular-list">{popular.map((item, index) => <li key={item.id}><span aria-hidden>{batch * 6 + index + 1}</span><Link href={postHref(item)}>{item.title ?? t(`posts.${item.id}.title`)}</Link></li>)}</ol></section></div>;
 }
 
-function DemoFeed({ section, productsContent, initialCategory = "all", initialId = null, onCategoryChange }: { section?: CommunitySection; productsContent?: ReactNode; initialCategory?: string; initialId?: string | null; onCategoryChange?: (category: string) => void }) {
+function DemoFeed({ posts, section, productsContent, initialCategory = "all", initialId = null, onCategoryChange }: { posts: DemoPost[]; section?: CommunitySection; productsContent?: ReactNode; initialCategory?: string; initialId?: string | null; onCategoryChange?: (category: string) => void }) {
   const t = useTranslations("community");
-  const [sort, setSort] = useState<SortMode>(section ? "latest" : "recommended");
+  const [sort, setSort] = useState<SortMode>("latest");
   const [category, setCategory] = useState(() => section && SECTION_CATEGORIES[section].includes(initialCategory) ? initialCategory : "all");
   const [visible, setVisible] = useState(8);
   const showProducts = section === "feedback" && category === "builds";
@@ -81,7 +75,7 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
       window.history.replaceState(null, "", url);
     }
   }
-  const filtered = DEMO_POSTS.filter((post) => !(post.section === "feedback" && (post.category === "wallet" || (section === "feedback" && post.category === "builds"))) && (!section || post.section === section) && (category === "all" || post.category === category) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
+  const filtered = posts.filter((post) => !(post.section === "feedback" && (post.category === "wallet" || (section === "feedback" && post.category === "builds"))) && (!section || post.section === section) && (category === "all" || post.category === category) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
   const hasSidebar = !section || section === "discussion";
   return <div className={`community-layout ${hasSidebar ? section ? "community-discussion-layout" : "community-home-layout" : "community-board-layout"}`}>
     <section className="community-panel community-feed-panel" aria-label={t("feedLabel")}>
@@ -89,7 +83,7 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
         <button type="button" aria-pressed={category === "all"} onClick={() => changeCategory("all")}>{t("all")}</button>
         {SECTION_CATEGORIES[section].map((value) => <button key={value} type="button" aria-pressed={category === value} onClick={() => changeCategory(value)}>{t(`categories.${value}`)}</button>)}
       </div>}
-      <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} />{section !== "feedback" && <span>{t("exampleCount", { count: filtered.length })}</span>}</div>
+      <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} />{section !== "feedback" && <span>{t("postCount", { count: filtered.length })}</span>}</div>
       <CoCreationFeedContext.Provider value={{ sort, category }}>
         {section === "feedback" && <>
           <div hidden={category !== "all" && !showFeedback}><CooperationPreview embedded initialId={initialId} sort={sort} overview={category === "all"} onOpen={() => changeCategory("wallet")} /></div>
@@ -106,62 +100,11 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
   </div>;
 }
 
-export function CommunityHome() {
-  return <div className="community-page community-home" id="main-content" tabIndex={-1}><div className="community-shell"><HomeSpotlight /><DemoFeed /></div></div>;
+export function CommunityHome({ posts }: { posts: DemoPost[] }) {
+  return <div className="community-page community-home" id="main-content" tabIndex={-1}><div className="community-shell"><HomeSpotlight posts={posts} /><DemoFeed posts={posts} /></div></div>;
 }
 
-export function CommunityBoard({ section, productsContent, initialCategory, initialId = null }: { section: CommunitySection; productsContent?: ReactNode; initialCategory?: string; initialId?: string | null }) {
+export function CommunityBoard({ posts, section, productsContent, initialCategory, initialId = null }: { posts: DemoPost[]; section: CommunitySection; productsContent?: ReactNode; initialCategory?: string; initialId?: string | null }) {
   const t = useTranslations("community");
-  return <div className="community-page" id="main-content" tabIndex={-1}><div className="community-shell"><nav className="community-breadcrumb" aria-label={t("breadcrumb")}><Link href="/">{t("home")}</Link><span aria-hidden>/</span><span aria-current="page">{t(`sections.${section}.name`)}</span></nav><h1 className="sr-only">{t(`sections.${section}.name`)}</h1><DemoFeed section={section} productsContent={productsContent} initialCategory={initialCategory} initialId={initialId} /></div></div>;
-}
-
-function DemoComments({ post, onCountChange }: { post: DemoPost; onCountChange: (count: number) => void }) {
-  const t = useTranslations("community");
-  const format = useFormatter();
-  const [comments, setComments] = useState<DemoComment[]>(() => demoSeedComments(post));
-  const [body, setBody] = useState("");
-  const [replyTarget, setReplyTarget] = useState<string | null>(null);
-  const [sort, setSort] = useState<"popular" | "latest">("popular");
-  const [liked, setLiked] = useState<string[]>([]);
-  const [collapsed, setCollapsed] = useState<string[]>([]);
-  const [announcement, setAnnouncement] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
-  function submit(event: FormEvent) {
-    event.preventDefault(); if (!body.trim()) return;
-    const rootId = replyTarget ? (comments.find((comment) => comment.id === replyTarget)?.parent ?? replyTarget) : undefined;
-    setComments((previous) => [...previous, { id: `local-${previous.length}`, body: body.trim(), author: "you", level: 2, likes: 0, order: previous.length + 1, parent: rootId, local: true }]);
-    onCountChange(comments.length + 1);
-    if (rootId) setCollapsed((previous) => previous.filter((id) => id !== rootId));
-    setBody(""); setReplyTarget(null); setAnnouncement(t("commentAdded"));
-  }
-  function toggleLike(id: string) { setLiked((previous) => previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]); setAnnouncement(t("localInteraction")); }
-  const roots = comments.filter((comment) => !comment.parent);
-  const repliesByRoot = new Map(roots.map((root) => [root.id, comments.filter((comment) => comment.parent === root.id).sort((a, b) => a.order - b.order)]));
-  function shareComment(id: string) {
-    const target = new URL(`${window.location.pathname}#comment-${id}`, window.location.origin);
-    if (target.protocol !== "http:" && target.protocol !== "https:") {
-      setAnnouncement(t("commentLinkFailed"));
-      return;
-    }
-    void navigator.clipboard?.writeText(target.toString()).then(() => setAnnouncement(t("commentLinkCopied")), () => setAnnouncement(t("commentLinkFailed")));
-  }
-  function renderComment(comment: DemoComment, reply = false) {
-    const createdAt = new Date(new Date(post.createdAt).getTime() - Math.max(0, post.commentCount - comment.order) * 17 * 60_000);
-    return <div className={`community-comment ${reply ? "community-comment-reply" : ""}`} key={comment.id} id={`comment-${comment.id}`}><Avatar name={t(`authors.${comment.author}`)} className={`community-avatar community-avatar-${comment.author}`} /><div className="community-comment-content"><div className="community-comment-author"><strong>{t(`authors.${comment.author}`)}</strong><LevelBadge level={comment.level} size="xs" showIcon={false} />{comment.local && <span>{t("justNow")}</span>}</div><p>{comment.local ? comment.body : t(`comments.${comment.body}`)}</p><div className="community-comment-actions"><button type="button" aria-pressed={liked.includes(comment.id)} onClick={() => toggleLike(comment.id)}><CommentToolbarIcon name="upvote" /> {t("upvoteCount", { count: comment.likes + Number(liked.includes(comment.id)) })}</button><button type="button" onClick={() => { setReplyTarget(comment.id); setBody(`@${t(`authors.${comment.author}`)} `); input.current?.focus(); }}><CommentToolbarIcon name="reply" />{t("reply")}</button><button type="button" disabled title={t("demoReportDisabled")}><CommentToolbarIcon name="report" />{t("report")}</button><button type="button" onClick={() => shareComment(comment.id)}><CommentToolbarIcon name="share" />{t("share")}</button><time dateTime={comment.local ? undefined : createdAt.toISOString()}><CommentToolbarIcon name="clock" />{comment.local ? t("justNow") : format.dateTime(createdAt, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" })}</time></div></div></div>;
-  }
-  return <section className="community-panel community-comments" id="comments"><div className="community-panel-heading"><h2>{t("commentsTitle", { count: comments.length })}</h2><div className="community-comment-sort"><button type="button" aria-pressed={sort === "popular"} onClick={() => setSort("popular")}>{t("sort.popular")}</button><button type="button" aria-pressed={sort === "latest"} onClick={() => setSort("latest")}>{t("sort.latest")}</button></div></div><p className="community-comment-demo-note">{t("commentDemoBoundary")}</p><form onSubmit={submit}>{replyTarget && <div className="community-reply-target">{t("replyingTo", { name: t(`authors.${comments.find((comment) => comment.id === replyTarget)?.author ?? "you"}`) })}<button type="button" onClick={() => setReplyTarget(null)}>{t("cancelReply")}</button></div>}<label className="sr-only" htmlFor="demo-comment-body">{t("commentPlaceholder")}</label><textarea id="demo-comment-body" ref={input} maxLength={1000} rows={3} value={body} onChange={(event) => setBody(event.target.value)} placeholder={t("commentPlaceholder")} /><div className="community-comment-submit"><button type="submit" className="community-button" disabled={!body.trim()}>{replyTarget ? t("addReply") : t("addComment")}</button></div></form>{announcement && <p className="community-local-status" role="status">{announcement}</p>}<div className="community-comment-list">{roots.sort((a, b) => sort === "latest" ? b.order - a.order : (b.likes + Number(liked.includes(b.id))) - (a.likes + Number(liked.includes(a.id)))).map((comment) => { const replies = repliesByRoot.get(comment.id) ?? []; const isCollapsed = collapsed.includes(comment.id); return <div className="community-comment-thread" key={comment.id}>{renderComment(comment)}{replies.length > 0 && <><button type="button" className="community-thread-toggle" aria-expanded={!isCollapsed} onClick={() => setCollapsed((previous) => isCollapsed ? previous.filter((id) => id !== comment.id) : [...previous, comment.id])}>{isCollapsed ? t("expandRepliesCount", { count: replies.length }) : t("collapseRepliesCount", { count: replies.length })}</button>{!isCollapsed && <div className="community-comment-replies">{replies.map((reply) => renderComment(reply, true))}</div>}</>}</div>; })}</div></section>;
-}
-
-export function CommunityPost({ post }: { post: DemoPost }) {
-  const t = useTranslations("community");
-  const format = useFormatter();
-  const [liked, setLiked] = useState(false);
-  const [supported, setSupported] = useState(false);
-  const [commentCount, setCommentCount] = useState(post.commentCount);
-  const [interactionStatus, setInteractionStatus] = useState("");
-  function toggleLike() { setLiked((value) => !value); setInteractionStatus(t("localInteraction")); }
-  function toggleSupport() { setSupported((value) => !value); setInteractionStatus(t("localInteraction")); }
-  const related = DEMO_POSTS.filter((item) => item.section === post.section && item.id !== post.id).slice(0, 3);
-  const jumpTo = (id: string) => { document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); if (id === "comments") document.getElementById("demo-comment-body")?.focus({ preventScroll: true }); };
-  return <div className="community-page community-detail-page" id="main-content" tabIndex={-1}><div className="community-shell"><nav className="community-breadcrumb" aria-label={t("breadcrumb")}><Link href="/">{t("home")}</Link><span aria-hidden>/</span><Link href={`/community/${post.section}`}>{t(`sections.${post.section}.name`)}</Link><span aria-hidden>/</span><span>{t(`categories.${post.category}`)}</span></nav><div className="community-layout"><div className="community-detail-main"><article className="community-panel community-article"><div className="community-post-labels"><span className="community-category">{t(`categories.${post.category}`)}</span>{post.status && <span className={`community-state community-state-${post.status}`}>{t(`states.${post.status}`)}</span>}</div><h1>{t(`posts.${post.id}.title`)}</h1><div className="community-article-author"><Avatar name={t(`authors.${post.author}`)} className={`community-avatar community-avatar-${post.author}`} /><strong>{t(`authors.${post.author}`)}</strong><LevelBadge level={post.level} showIcon={false} /><time dateTime={post.createdAt}>{format.dateTime(new Date(post.createdAt), { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time></div><div className="community-article-body"><p className="community-article-lede">{t(`posts.${post.id}.excerpt`)}</p>{["body1", "body2", "body3"].map((key) => <p key={key}>{t(`posts.${post.id}.${key}`)}</p>)}{hasDemoSupport(post) && <section id="demo-poll" className="community-poll" aria-labelledby="support-title"><h2 id="support-title">{t(post.category === "builds" ? "supportBuild" : "supportFeedback")}</h2><button type="button" aria-pressed={supported} onClick={toggleSupport}><span>{t(supported ? "supported" : "support")}</span><strong>{format.number(post.votes + Number(supported))}</strong></button><p aria-live="polite">{t("supportCount", { count: post.votes + Number(supported) })}</p></section>}</div><div className="community-detail-actions"><button type="button" aria-pressed={liked} onClick={toggleLike}>{liked ? "♥" : "♡"} {t("likeCount", { count: post.likes + Number(liked) })}</button><button type="button" onClick={() => jumpTo("comments")}>{t("commentCount", { count: commentCount })}</button>{hasDemoSupport(post) && <button type="button" onClick={() => jumpTo("demo-poll")}>{t("support")}</button>}</div>{interactionStatus && <p className="community-local-status" role="status">{interactionStatus}</p>}<p className="sr-only" aria-live="polite">{t("likeCount", { count: post.likes + Number(liked) })}</p></article><DemoComments post={post} onCountChange={setCommentCount} /></div><aside className="community-sidebar"><section className="community-panel community-author-card"><Avatar name={t(`authors.${post.author}`)} className={`community-avatar community-avatar-${post.author}`} /><h2>{t(`authors.${post.author}`)}</h2><LevelBadge level={post.level} showName /><div><strong>{t("authorPostCount", { count: DEMO_POSTS.filter((item) => item.author === post.author).length })}</strong></div><Link href={`/community/${post.section}`}>{t("backToBoard")}<span aria-hidden>↗</span></Link></section><PopularPosts section={post.section} exclude={post.id} /></aside></div><section className="community-panel community-related"><div className="community-panel-heading"><h2>{t("related")}</h2><Link href={`/community/${post.section}`}>{t("backToBoard")} ↗</Link></div>{related.map((item) => <PostRow key={item.id} post={item} />)}</section></div><div className="community-mobile-actions"><button type="button" aria-pressed={liked} onClick={toggleLike}>{liked ? "♥" : "♡"} {t("likeCount", { count: post.likes + Number(liked) })}</button><button type="button" onClick={() => jumpTo("comments")}>{t("commentCount", { count: commentCount })}</button>{hasDemoSupport(post) && <button type="button" onClick={() => jumpTo("demo-poll")}>{t("support")}</button>}</div></div>;
+  return <div className="community-page" id="main-content" tabIndex={-1}><div className="community-shell"><nav className="community-breadcrumb" aria-label={t("breadcrumb")}><Link href="/">{t("home")}</Link><span aria-hidden>/</span><span aria-current="page">{t(`sections.${section}.name`)}</span></nav><h1 className="sr-only">{t(`sections.${section}.name`)}</h1><DemoFeed posts={posts} section={section} productsContent={productsContent} initialCategory={initialCategory} initialId={initialId} /></div></div>;
 }

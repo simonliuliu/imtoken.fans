@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getModerationMode, type ModerationTargetType } from "@/lib/moderation/settings";
 import { runAiModeration } from "@/lib/moderation/ai-review";
+import { awardXpByRule } from "@/lib/xp";
 import { refreshBadgesForUser } from "@/lib/badges";
 
 const TARGET_TABLE: Record<ModerationTargetType, "submissions" | "comments"> = {
@@ -33,24 +34,31 @@ export async function runModerationPipeline(
   const table = TARGET_TABLE[params.targetType];
 
   if (mode === "none") {
-    await admin.from(table).update({ status: "published" }).eq("id", params.targetId);
+    const { error } = await admin.from(table).update({ status: "published" }).eq("id", params.targetId);
+    if (error) throw new Error("Moderation publication failed");
     // 徽章重算要好几次查询，而且和"这条内容能不能显示"无关，挪到响应之后做。
     after(() => refreshBadgesForUser(params.authorId));
     return "published";
   }
 
   const source = mode === "ai" ? "ai" : "human";
-  await admin.from("moderation_queue").insert({
+  const { error: queueError } = await admin.from("moderation_queue").insert({
     target_type: params.targetType,
     target_id: params.targetId,
     source,
     result: "pending",
   });
 
+  if (queueError) throw new Error("Moderation queue save failed");
+
   if (mode === "ai") {
     after(() => applyAiDecision(params));
   }
   return "pending";
+}
+
+export function scheduleCommentAiModeration(params: PipelineParams): void {
+  after(() => applyAiDecision(params));
 }
 
 async function applyAiDecision(params: PipelineParams): Promise<void> {
@@ -62,7 +70,8 @@ async function applyAiDecision(params: PipelineParams): Promise<void> {
   const table = TARGET_TABLE[params.targetType];
   const status = decision.approved ? "published" : "rejected";
 
-  await admin.from(table).update({ status }).eq("id", params.targetId);
+  const { data: changed, error } = await admin.from(table).update({ status }).eq("id", params.targetId).eq("status", "pending").is("deleted_at", null).select("id").maybeSingle();
+  if (error || !changed) return;
   await admin
     .from("moderation_queue")
     .update({
@@ -76,5 +85,7 @@ async function applyAiDecision(params: PipelineParams): Promise<void> {
 
   if (decision.approved) {
     await refreshBadgesForUser(params.authorId);
+    const { data: submission } = params.targetType === "submission" ? await admin.from("submissions").select("type").eq("id", params.targetId).maybeSingle() : { data: null };
+    await awardXpByRule({ userId: params.authorId, action: params.targetType === "comment" ? "comment_posted" : submission?.type === "post" ? "submission_post" : submission?.type === "product" ? "submission_product" : "submission_idea", refType: params.targetType, refId: params.targetId });
   }
 }

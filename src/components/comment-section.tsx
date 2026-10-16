@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { useTranslations } from "next-intl";
 import { CommentForm, CommentItem } from "@/components/comment-form";
 import type { CommentWithAuthor, UserTagKey } from "@/lib/types";
@@ -12,7 +13,12 @@ const SORT_OPTIONS: { key: SortMode; labelKey: "sortTop" | "sortNewest" }[] = [
   { key: "newest", labelKey: "sortNewest" },
 ];
 
-export function CommentSection({
+export function CommentSection(props: Parameters<typeof CommentSectionBody>[0]) {
+  const { user, sessionEpoch } = useAuth();
+  return <CommentSectionBody key={`${user?.id ?? "guest"}:${sessionEpoch}`} {...props} comments={props.comments.filter(c => c.status === "published" || c.user_id === user?.id)} isLoggedIn={Boolean(user)} />;
+}
+
+function CommentSectionBody({
   submissionId,
   commentCount,
   comments,
@@ -46,12 +52,25 @@ export function CommentSection({
     ...localComments.filter((c) => !serverIds.has(c.id)),
   ].map((c) => (c.id in pinOverrides ? { ...c, pinned_at: pinOverrides[c.id] } : c));
 
+  const byId = new Map(merged.map(c => [c.id, c]));
+  function rootOf(comment: CommentWithAuthor): string | null {
+    let parent = comment.parent_id;
+    const visited = new Set([comment.id]);
+    while (parent && byId.get(parent)?.parent_id) {
+      if (visited.has(parent)) return null;
+      visited.add(parent);
+      parent = byId.get(parent)!.parent_id;
+    }
+    return parent;
+  }
   const repliesByParent = new Map<string, CommentWithAuthor[]>();
   for (const comment of merged) {
     if (!comment.parent_id) continue;
-    const list = repliesByParent.get(comment.parent_id) ?? [];
+    const root = rootOf(comment);
+    if (!root) continue;
+    const list = repliesByParent.get(root) ?? [];
     list.push(comment);
-    repliesByParent.set(comment.parent_id, list);
+    repliesByParent.set(root, list);
   }
   // 回复恒按时间正序（对话要按顺序读），不受 Top/Newest 影响。
   for (const list of repliesByParent.values()) {

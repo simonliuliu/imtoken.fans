@@ -73,10 +73,10 @@ export function StatusPill({ status }: { status: string }) {
   );
 }
 
-export function TypePill({ type }: { type: "product" | "idea" }) {
+export function TypePill({ type }: { type: "product" | "idea" | "post" }) {
   return (
     <span className="rounded-full bg-brand-soft px-2 py-0.5 font-mono text-[10px] font-medium text-brand-ink">
-      {type === "product" ? "产品" : "点子"}
+      {type === "product" ? "产品" : type === "post" ? "社区帖" : "点子"}
     </span>
   );
 }

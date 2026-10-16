@@ -131,6 +131,7 @@ export type XpActionKey =
   | "comment_posted"
   | "submission_product"
   | "submission_idea"
+  | "submission_post"
   | "vote_cast"
   | "simulated_investment"
   | "comment_upvote_received";
@@ -138,7 +139,8 @@ export type XpActionKey =
 // 和 PERMISSION_INFO / BADGE_INFO 同一个套路：数值存数据库（后台可改），
 // 文案留在代码里。后台只能改这几个 key 的数值，不能新增代码不认识的 key。
 export const XP_ACTION_INFO: Record<XpActionKey, { label: string; description: string }> = {
-  comment_posted: { label: "回复消息", description: "在产品 / 点子下发表评论或回复" },
+  comment_posted: { label: "回复消息", description: "在社区内容下发表评论或回复" },
+  submission_post: { label: "发布社区帖子", description: "社区帖子通过审核并发布" },
   submission_product: { label: "发布产品", description: "提交的产品通过审核并发布" },
   submission_idea: { label: "发布点子", description: "提交的点子通过审核并发布" },
   vote_cast: { label: "参与投票", description: "给一个作品投票（同一个作品只计一次）" },
@@ -147,7 +149,8 @@ export const XP_ACTION_INFO: Record<XpActionKey, { label: string; description: s
 };
 
 export const XP_ACTION_INFO_EN: Record<XpActionKey, { label: string; description: string }> = {
-  comment_posted: { label: "Comment", description: "Post a comment or reply on a product / idea" },
+  comment_posted: { label: "Comment", description: "Post a comment or reply on community content" },
+  submission_post: { label: "Community post", description: "A community post is approved and published" },
   submission_product: { label: "Publish a product", description: "Your product submission is approved and published" },
   submission_idea: { label: "Publish an idea", description: "Your idea submission is approved and published" },
   vote_cast: { label: "Vote", description: "Vote on a submission (counted once per submission)" },

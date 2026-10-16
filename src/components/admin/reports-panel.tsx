@@ -78,7 +78,7 @@ export function ReportsPanel({ reports: initialReports }: { reports: CommentRepo
 
                 {report.submission_id && report.submission_type && (
                   <Link
-                    href={`/${report.submission_type === "product" ? "products" : "ideas"}/${report.submission_id}`}
+                    href={report.submission_href ?? "#"}
                     className="mt-1 block truncate text-xs text-muted transition-colors hover:text-brand-ink"
                   >
                     来自：{report.submission_title ?? "（内容已删除）"}

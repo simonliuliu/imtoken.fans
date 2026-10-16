@@ -118,7 +118,7 @@ export async function restoreContent(kind: ContentKind, id: string, actorId: str
       action:
         kind === "comment"
           ? "comment_posted"
-          : row.type === "product"
+          : row.type === "post" ? "submission_post" : row.type === "product"
             ? "submission_product"
             : "submission_idea",
       refType: kind,

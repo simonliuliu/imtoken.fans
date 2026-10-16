@@ -61,7 +61,7 @@ test('products stay in the human queue even when the global mode is none', async
   const writes = [];
   const admin = { from: table => ({
     update: value => ({ eq: async () => { writes.push({ table, value }); } }),
-    insert: async value => { writes.push({ table, value }); },
+    insert: async value => { writes.push({ table, value }); return { error: null }; },
   }) };
   const { runModerationPipeline } = load('src/lib/moderation/pipeline.ts', {
     'server-only': {}, 'next/server': { after() {} },
@@ -69,6 +69,7 @@ test('products stay in the human queue even when the global mode is none', async
     '@/lib/supabase/admin': { createAdminClient: () => admin },
     '@/lib/moderation/settings': { getModerationMode: async () => { modeLookups++; return 'none'; } },
     '@/lib/moderation/ai-review': {}, '@/lib/badges': {},
+    '@/lib/xp': { awardXpByRule() { throw new Error('Pending products must not award XP'); } },
   });
   const state = await runModerationPipeline({ targetType: 'submission', targetId: 'test-id', authorId: 'test-user', content: 'test', requireManual: true });
   assert.equal(state, 'pending');

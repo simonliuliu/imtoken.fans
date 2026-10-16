@@ -1,3 +1,4 @@
+import { getCommunityPosts } from "@/lib/community";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
@@ -18,6 +19,7 @@ export default async function CommunityBoardPage({ params, searchParams }: {
   return (
     <CommunityBoard
       key={`${section}:${initialCategory}:${typeof idea === "string" ? idea : ""}:${typeof commentOffset === "string" ? commentOffset : "0"}`}
+      posts={await getCommunityPosts(section)}
       section={section}
       initialCategory={initialCategory}
       initialId={typeof idea === "string" ? idea : null}

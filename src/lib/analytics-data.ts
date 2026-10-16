@@ -1,4 +1,5 @@
 import "server-only";
+import { submissionHref, type SubmissionType } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ANALYTICS_TZ, OTHER_ROUTE, PAGE_VIEW_RETENTION_DAYS } from "@/lib/analytics";
 
@@ -37,7 +38,8 @@ export interface RouteRow {
 
 export interface ContentRow {
   submissionId: string;
-  type: "product" | "idea";
+  type: SubmissionType;
+  href: string;
   title: string;
   views: number;
   visitors: number;
@@ -262,6 +264,12 @@ export async function getAnalyticsOverview(rangeDays: number): Promise<Analytics
     rpcRows(admin, "analytics_unknown_paths", { ...now, p_route: OTHER_ROUTE, p_limit: 10 }),
   ]);
 
+  const postIds = content.rows.filter(row => row.submission_type === "post").map(row => String(row.submission_id));
+  const { data: communityRows } = postIds.length
+    ? await admin.from("submissions").select("id, community_section, legacy_slug").in("id", postIds)
+    : { data: [] };
+  const postLinks = new Map((communityRows ?? []).map(row => [row.id, submissionHref({ ...row, type: "post" })]));
+
   return {
     // 一个来自 0019、一个来自 0020：任意一个文件没执行都要让页面弹提示，
     // 否则只缺 0020 时半张看板静悄悄地全是 0，看的人会以为是真没数据。
@@ -287,7 +295,8 @@ export async function getAnalyticsOverview(rangeDays: number): Promise<Analytics
     })),
     content: content.rows.map((row) => ({
       submissionId: String(row.submission_id),
-      type: row.submission_type === "idea" ? "idea" : "product",
+      type: row.submission_type === "post" ? "post" : row.submission_type === "idea" ? "idea" : "product",
+      href: row.submission_type === "post" ? postLinks.get(String(row.submission_id)) ?? "/community/discussion" : `/${row.submission_type === "idea" ? "ideas" : "products"}/${row.submission_id}`,
       title: String(row.title ?? ""),
       views: num(row.views),
       visitors: num(row.visitors),

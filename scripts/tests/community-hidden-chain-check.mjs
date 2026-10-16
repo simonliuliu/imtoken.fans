@@ -1,0 +1,10 @@
+import{db,ids,as,denied,check,out,post,comment,root}from'./community-database-base.mjs';import fs from'node:fs/promises';import assert from'node:assert/strict';import{randomUUID}from'node:crypto';
+for(const n of['0029_community_post_type.sql','0030_real_community.sql'])await db.exec(await fs.readFile(root+'/supabase/migrations/'+n,'utf8'));
+const pid=await post('a');const parent=await comment(pid,'b');const child=await comment(pid,'a','published',parent);
+await check('published reply accessible before ancestor hidden',async()=>assert.equal((await as('authenticated','member',()=>db.query('select id from comments where id=$1',[child]))).rows.length,1));
+await db.query("update comments set status='rejected' where id=$1",[parent]);
+await check('hidden ancestor blocks public reply read',async()=>assert.equal((await as('authenticated','member',()=>db.query('select id from comments where id=$1',[child]))).rows.length,0));
+await check('hidden ancestor blocks reply likes',()=>denied(()=>as('authenticated','member',()=>db.query('select community_comment_like_write($1,$2,true)',[ids.member,child]))));
+await check('hidden ancestor blocks reply creation',()=>denied(()=>as('authenticated','member',()=>db.query("select community_comment_create($1,$2,$3,'QA body',$4)",[ids.member,randomUUID(),pid,child]))));
+await check('hidden ancestor removes notification preview and unread count',async()=>{const r=(await as('authenticated','b',()=>db.query('select notification_read($1) r',[ids.b]))).rows[0].r;assert(!r.items.some(n=>n.comment_id===child));});
+console.log(JSON.stringify(out,null,2));await db.close();if(out.some(r=>r.result==='FAIL'))process.exit(1);
