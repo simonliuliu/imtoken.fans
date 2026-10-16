@@ -1541,8 +1541,8 @@
     "postCount": "{count} 篇内容"
   },
   "tokenPersonas": {
-    "visitPersona": "前往数字币人社区：{name}",
-    "externalNotice": "点击任意数字币人，进入数字币人社区。",
+    "visitAgent": "前往 bman Agent 主页：{name}",
+    "externalNotice": "点击头像，前往对应的 bman Agent 主页。",
     "title": "数字币人",
     "previewLabel": "圈子预览 · 功能筹备中",
     "openPersona": "查看 {name} 圈子预览",
@@ -1550,6 +1550,12 @@
     "close": "关闭圈子预览",
     "placeholderNotice": "这是角色圈子的占位预览，头像与性格均为展示设定。圈子互动和聊天尚未开放，可先到综合交流参与讨论。",
     "visitDiscussion": "去综合交流",
+    "agents": {
+      "zec": "ZEC",
+      "near": "NEAR",
+      "niulai": "牛来",
+      "tron": "TRON"
+    },
     "characters": {
       "btc": {
         "name": "BTC",

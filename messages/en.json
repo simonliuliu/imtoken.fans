@@ -1541,8 +1541,8 @@
     "postCount": "{count} posts"
   },
   "tokenPersonas": {
-    "visitPersona": "Visit the digital coin community: {name}",
-    "externalNotice": "Select any character to visit the digital coin community.",
+    "visitAgent": "Open the bman Agent profile: {name}",
+    "externalNotice": "Select an Agent to open its bman profile.",
     "title": "Token Personas",
     "previewLabel": "Circle preview · In preparation",
     "openPersona": "Preview the {name} circle",
@@ -1550,6 +1550,12 @@
     "close": "Close circle preview",
     "placeholderNotice": "This is a placeholder for a character circle. Avatars and personalities are fictional display concepts. Circle interactions and chat are not available yet; you can join the discussion board for now.",
     "visitDiscussion": "Visit Discussion",
+    "agents": {
+      "zec": "ZEC",
+      "near": "NEAR",
+      "niulai": "牛来",
+      "tron": "TRON"
+    },
     "characters": {
       "btc": {
         "name": "BTC",
