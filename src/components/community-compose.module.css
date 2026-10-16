@@ -21,3 +21,15 @@
   text-decoration: underline;
   font-weight: 600;
 }
+.loginNotice {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #cbd9ec;
+  border-radius: 8px;
+  background: #f1f6fd;
+  color: #345477;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.loginNotice:focus { outline: 2px solid #668bb8; outline-offset: 3px; }
+.searchStatus { margin-top: 12px; color: #68778e; font-size: 12px; line-height: 1.7; }

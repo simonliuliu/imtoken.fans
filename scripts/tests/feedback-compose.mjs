@@ -12,12 +12,12 @@ import ts from 'typescript';
 
 const source = fs.readFileSync(new URL('../../src/components/community-elements.tsx', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-function host({ responses = [], uuidThrows = false, searchThrows = false } = {}) {
+function host({ responses = [], uuidThrows = false, searchThrows = false, owner = "current-account", searchPosts = [], autoFill = true } = {}) {
   let slots = [], cursor = 0, effects = [], tree, nextTimer = 0;
   const timers = new Map(), elements = new Map(), translations = new Map();
-  const calls = [], navigation = [], events = [], focus = [], scroll = [], clearedDrafts = [];
+  const calls = [], navigation = [], events = [], focus = [], scroll = [], clearedDrafts = [], savedDrafts = [];
   let uuidCalls = 0;
-  const state = { searchThrows, uuidThrows, reads: 0 };
+  const state = { searchThrows, uuidThrows, reads: 0, searchPosts };
   const jsx = (type, props) => ({ type, props: props ?? {} });
   const hooks = {
     useState(initial) { const i = cursor++; slots[i] ??= { value: typeof initial === 'function' ? initial() : initial }; return [slots[i].value, (next) => { slots[i].value = typeof next === 'function' ? next(slots[i].value) : next; }]; },
@@ -28,13 +28,13 @@ function host({ responses = [], uuidThrows = false, searchThrows = false } = {})
   const modules = {
     react: hooks,
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: Symbol.for('fragment') },
-    'next-intl': { useTranslations(namespace) { if (!translations.has(namespace)) translations.set(namespace, (key) => `${namespace}.${key}`); return translations.get(namespace); } },
-    '@/lib/auth-context': { useAuth: () => ({ user: { id: 'current-account' }, loading: false, sessionEpoch: 0 }) },
-    '@/lib/feedback-drafts': { saveFeedbackDraft() {}, takeFeedbackDraft() { return null; }, clearFeedbackDraft(...args) { clearedDrafts.push(args); } },
+    'next-intl': { useTranslations(namespace) { if (!translations.has(namespace)) translations.set(namespace, (key, values) => `${namespace}.${key}${values ? " " + JSON.stringify(values) : ""}`); return translations.get(namespace); } },
+    '@/lib/auth-context': { useAuth: () => ({ user: owner ? { id: owner } : null, loading: false, sessionEpoch: 0 }) },
+    '@/lib/feedback-drafts': { saveFeedbackDraft(...args) { savedDrafts.push(args); }, takeFeedbackDraft() { return null; }, clearFeedbackDraft(...args) { clearedDrafts.push(args); } },
     '@/i18n/navigation': { Link: 'a', useRouter: () => ({ push: (href) => navigation.push(href) }) },
     '@/app/actions/feedback': {
       async writeFeedback(action, payload) { calls.push({ action, payload: { ...payload } }); const result = responses.shift(); if (result instanceof Error) throw result; return typeof result === 'function' ? result() : result; },
-      async readFeedback() { state.reads++; if (state.searchThrows) throw Error('search unavailable'); return { ok: true, data: { posts: [], viewer: { user_id: 'current-account' } } }; },
+      async readFeedback() { state.reads++; if (state.searchThrows) throw Error('search unavailable'); return { ok: true, data: { posts: state.searchPosts, viewer: { user_id: owner } } }; },
     },
     '@/lib/feedback': { FEEDBACK_MODULES: ['wallet', 'transfer', 'browser', 'other'], FEEDBACK_CHANGED: 'feedback-changed', FEEDBACK_COMPOSE: 'feedback-compose' },
     '@/lib/community-demo': { COMMUNITY_SECTIONS: ['safety', 'feedback', 'discussion', 'activities'], SECTION_CATEGORIES: { safety: ['guides'], feedback: ['wallet', 'builds', 'changelog'], discussion: ['questions'], activities: ['community'] } },
@@ -73,17 +73,28 @@ function host({ responses = [], uuidThrows = false, searchThrows = false } = {})
     assert.equal(alert.props.tabIndex, -1); assert.equal(focus.at(-1), 'alert'); assert.equal(scroll.at(-1).block, 'nearest');
     assert.equal(find((node) => node.props.type === 'submit').node.props.disabled, false); assertRetained();
   }
-  render(); fill();
-  return { render, find, findAll, text, submit, assertFailure, assertRetained, calls, navigation, events, state, clearedDrafts, get uuidCalls() { return uuidCalls; }, async runTimers() { const pending = [...timers.values()]; timers.clear(); for (const callback of pending) await callback(); render(); }, unmount() { for (const slot of slots) slot?.cleanup?.(); } };
+  render(); if (autoFill) fill();
+  return { render, fill, changeTitle(value) { find((node) => node.type === "input").node.props.onChange({ target: { value } }); render(); }, find, findAll, text, submit, assertFailure, assertRetained, calls, navigation, events, state, clearedDrafts, savedDrafts, get uuidCalls() { return uuidCalls; }, async runTimers() { const pending = [...timers.values()]; timers.clear(); for (const callback of pending) await callback(); render(); }, unmount() { for (const slot of slots) slot?.cleanup?.(); } };
 }
 let passed = 0;
 async function test(name, run) { await run(); passed++; console.log(`PASS ${name}`); }
-await test('returned login failure is near submit, focused, keeps fields, and provides login handoff', async () => {
+await test('anonymous login requirement is visible before writing and publishes no request', async () => {
+  const h = host({ owner: null, autoFill: false });
+  assert(h.findAll((node) => node.props.role === 'status').some((node) => h.text(node).includes('feedbackLive.signInBeforePublish')));
+  const button = h.find((node) => node.type === 'button' && h.text(node).includes('feedbackLive.signInPublish')).node;
+  assert.equal(button.props.disabled, false);
+  h.fill(); await h.submit(); h.render(); h.assertRetained();
+  assert.equal(h.calls.length, 0); assert.equal(h.uuidCalls, 0); assert.equal(h.findAll((node) => node.props.role === 'alert').length, 0);
+  assert.equal(h.savedDrafts.length, 1); assert.equal(h.savedDrafts[0][0], 'idea'); assert.equal(h.savedDrafts[0][1], null); assert.equal(h.savedDrafts[0][2].title, 'Real user title');
+  assert(h.navigation[0].includes('/auth/sign-in?redirect=')); assert(decodeURIComponent(h.navigation[0]).includes('composeFeedback=1'));
+});
+await test('expired server session becomes neutral login handoff with fields retained', async () => {
   const h = host({ responses: [{ ok: false, code: 'sign_in', error: 'Please sign in to save this IDEA.' }] });
-  await h.submit(); h.assertFailure('Please sign in');
-  const alert = h.find((node) => node.props.role === 'alert').node;
-  assert(h.text(alert).includes('feedbackLive.signInContinue'));
-  assert.equal(h.calls.length, 1); assert.equal(h.navigation.length, 0); assert.equal(h.events.length, 0);
+  await h.submit(); h.render(); h.assertRetained();
+  assert.equal(h.findAll((node) => node.props.role === 'alert').length, 0);
+  assert(h.findAll((node) => node.props.role === 'status').some((node) => h.text(node).includes('feedbackLive.signInBeforePublish')));
+  assert.equal(h.calls.length, 1);
+  await h.submit(); assert.equal(h.calls.length, 1); assert.equal(h.savedDrafts[0][1], 'current-account'); assert(h.navigation[0].includes('/auth/sign-in'));
 });
 await test('empty returned errors fall back to a nonempty visible failure', async () => {
   const h = host({ responses: [{ ok: false, code: 'request_failed', error: '   ' }] }); await h.submit(); h.assertFailure('feedbackLive.unexpected');
@@ -115,9 +126,21 @@ await test('unmounted account response cannot navigate or broadcast into a new s
   assert.equal(h.navigation.length, 0); assert.equal(h.events.length, 0); assert.equal(h.clearedDrafts.length, 0);
 });
 await test('search throw is handled as a search status and does not lose form input', async () => {
-  const h = host({ searchThrows: true }); await h.runTimers(); assert.equal(h.state.reads, 1); assert(h.findAll((node) => node.props.role === 'status').some((node) => h.text(node).includes('feedbackLive.unexpected'))); h.assertRetained(); assert.equal(h.findAll((node) => node.props.role === 'alert').length, 0);
+  const h = host({ searchThrows: true }); await h.runTimers(); assert.equal(h.state.reads, 1); assert(h.findAll((node) => node.props.role === 'status').some((node) => h.text(node).includes('feedbackLive.similarSearchError'))); h.assertRetained(); assert.equal(h.findAll((node) => node.props.role === 'alert').length, 0);
 });
 await test('malformed success cannot clear inputs or pretend to publish', async () => {
   const h = host({ responses: [{ ok: true, data: {} }] }); await h.submit(); h.assertFailure('feedbackLive.unexpected'); assert.equal(h.navigation.length, 0); assert.equal(h.clearedDrafts.length, 0);
+});
+await test('loading and zero matches do not display a suggestions block or no-results message', async () => {
+  const h = host();
+  assert.equal(h.findAll((node) => node.type === 'section').length, 0);
+  await h.runTimers(); assert.equal(h.findAll((node) => node.type === 'section').length, 0);
+  assert(!h.text(h.find((node) => node.type === 'form').node).includes('feedbackLive.noSimilar'));
+});
+await test('real matches show suggestions and editing title immediately removes old matches', async () => {
+  const h = host({ searchPosts: [{ id: 'existing', title: 'A real matching IDEA' }] });
+  await h.runTimers(); assert.equal(h.findAll((node) => node.type === 'section').length, 1);
+  assert(h.findAll((node) => node.type === 'a').some((node) => h.text(node).includes('A real matching IDEA')));
+  h.changeTitle('A different idea'); assert.equal(h.findAll((node) => node.type === 'section').length, 0);
 });
 console.log(`${passed} Composer regression cases passed against actual component handlers (mocked services).`);

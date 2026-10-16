@@ -1675,7 +1675,10 @@
     "resultCount": "共 {count} 个 IDEA",
     "emptyHint": "目前没有符合条件的真实反馈。清除筛选或发布你的第一个 IDEA。",
     "progressNotice": "展示当前页的真实反馈。票数不直接决定优先级，社区整理状态不等同于官方承诺。",
-    "emptyColumn": "当前页暂无反馈"
+    "emptyColumn": "当前页暂无反馈",
+    "signInBeforePublish": "发布前请先登录。你可以先填写内容，点击下方按钮将保留草稿，登录后继续发布。",
+    "signInPublish": "登录后继续发布",
+    "similarSearchError": "相似反馈搜索暂不可用：{error} 你仍可继续填写。"
   },
   "feedbackErrors": {
     "configuration": "产品反馈数据服务尚未配置，请联系管理员完成连接后重试。",

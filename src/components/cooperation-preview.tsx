@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useFormatter, useTranslations } from "next-intl";
+import { feedbackForumName } from "@/lib/feedback-author";
 import { useAuth } from "@/lib/auth-context";
 import { saveFeedbackDraft, takeFeedbackDraft } from "@/lib/feedback-drafts";
 import { Link } from "@/i18n/navigation";
@@ -93,7 +94,7 @@ function LiveFeedback({ initialId, owner }: { initialId: string | null; owner: s
     if (!active || !mergeChoice || busy) return; setBusy(true); setError("");
     try { const result = await writeFeedback("preview_merge", { id: active.id, version: active.version, other_id: mergeChoice.id, other_version: mergeChoice.version, expected_user_id: owner }); if (result.ok) setMergePreview({ id: result.data.id, support_count: result.data.support_count ?? 0 }); else { setError(result.error); setErrorCode(result.code); } } catch { setError(t("unexpected")); } finally { setBusy(false); }
   }
-  const author = (name: string | null) => name || t("member");
+  const author = (name: string | null) => feedbackForumName(name) || t("member");
   const resetFilters = () => { setQuery(""); setModule("all"); setStatus("all"); setOffset(0); };
   const compose = () => window.dispatchEvent(new Event(FEEDBACK_COMPOSE));
   const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(`/community/feedback?category=wallet${selected ? `&idea=${selected}&resumeComment=1` : ""}`)}`;
