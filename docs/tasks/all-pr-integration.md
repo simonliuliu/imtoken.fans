@@ -27,3 +27,11 @@
 ## 合并结果
 
 统一 PR #16 已用 merge commit 合入 main，提交 `4717d6b1f8b06147b3d3cfa8a03f5a29b0b78d87`。GitHub 已逐一确认 #6/#7/#8/#9/#13/#14/#15/#16 全部 MERGED；未通过关闭 PR 冒充合并。集成提交的 Vercel 检查 SUCCESS、无未解决审查讨论；#13 原分支的部署作者授权失败由所有者集成构建验证，未扩大应用授权。
+
+## 正式预览与资源修复
+
+Vercel production `dpl_BUiHe2R89sKndJNnDMnys2NZh3Ld` 已 READY，正式别名 `imtoken-fans.vercel.app` 对应 main `4717d6b`。中英首页、四板块和登录页面均 200；浏览器读取真实反馈空列表，原位切换社区产品显示 21 条历史产品，全局发帖弹窗正常。英文 390px 页面无横向溢出。
+
+线上发现生成资源 /icon、/apple-icon、/opengraph-image 被语言路由跳到 /zh/... 导致 404；PR #17 仅将这三条精确路径排除语言重定向，会话刷新与 matcher 保持原样。已阅读安装版 Next 指南，补丁 i18n/lint/build/6 项认证回归通过；独立 QA 23 个路由探针通过，最终资源 HTTP 结果补充在发布 PR。
+
+目标库事务回滚测试没有留存测试反馈。数据库身份声明测试不等同真人浏览器账号验收；视频/通知/旧审核和并发验收继续待办。
