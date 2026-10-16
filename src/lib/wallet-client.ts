@@ -100,10 +100,10 @@ export async function connectWalletConnectAndSignIn(
     chains: [1],
     showQrModal: true,
     metadata: {
-      name: "imAihunt",
+      name: "imToken Fans",
       description: messages.metadataDescription,
       url: window.location.origin,
-      icons: [`${window.location.origin}/next.svg`],
+      icons: [`${window.location.origin}/icon`],
     },
   });
 

@@ -16,7 +16,7 @@ for (const locale of ["zh", "en"]) {
     await expect(page.getByRole("button", { name: /提交点子|Submit an idea/ })).toHaveCount(0);
     await expect(page.getByPlaceholder(locale === "zh" ? "给它起个好记的名字" : "Give it a memorable name")).toHaveAttribute("maxlength", "60");
     await expect(page.getByPlaceholder("https://...", { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: locale === "zh" ? "提交审核" : "Submit for review", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: locale === "zh" ? "提交审核" : "Submit for review", exact: true })).toBeEnabled();
     await page.screenshot({ path: `test-results/product-only-${locale}-desktop.png`, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();

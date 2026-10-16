@@ -35,7 +35,7 @@ export function buildChallengeMessage({ address, nonce, issuedAt, locale }: Wall
   const lines =
     locale === "en"
       ? [
-          "imAihunt wants to verify that you own this wallet",
+          "imToken Fans wants to verify that you own this wallet",
           "",
           `Address: ${address}`,
           `Nonce: ${nonce}`,
@@ -44,7 +44,7 @@ export function buildChallengeMessage({ address, nonce, issuedAt, locale }: Wall
           "This is a gasless signature used only for sign-in. It makes no on-chain transaction or approval.",
         ]
       : [
-          "imAihunt 想要验证你的钱包所有权",
+          "imToken Fans 想要验证你的钱包所有权",
           "",
           `地址：${address}`,
           `随机码：${nonce}`,

@@ -104,3 +104,18 @@ test("community authentication, blacklist and duplicate checks remain enforced",
     assert.equal(calls.inserts.length, 0);
   }
 });
+
+test("stale product form cannot submit under a different account", async () => {
+  const { createSubmission, calls } = setup();
+  const result = await createSubmission(product({ expectedUser: "33333333-3333-4333-8333-333333333333" }));
+  assert.equal(result.code, "session_changed");
+  assert.equal(calls.inserts.length, 0);
+  assert.equal(calls.adminTables.length, 0);
+});
+
+test("expired product session returns an actionable sign-in code without writes", async () => {
+  const { createSubmission, calls } = setup({ signedIn: false });
+  const result = await createSubmission(product({ expectedUser: userId }));
+  assert.equal(result.code, "sign_in");
+  assert.equal(calls.inserts.length, 0);
+});
