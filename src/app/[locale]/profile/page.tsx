@@ -1,3 +1,4 @@
+import { submissionHref } from "@/lib/types";
 import { useTranslations } from "next-intl";
 import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
@@ -187,7 +188,7 @@ export default async function ProfilePage() {
               {submissions.map((s) => (
                 <Link
                   key={s.id}
-                  href={`/${s.type === "product" ? "products" : "ideas"}/${s.id}`}
+                  href={submissionHref(s)}
                   className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-brand"
                 >
                   <div className="min-w-0">

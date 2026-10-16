@@ -364,12 +364,12 @@ export default async function AdminAnalyticsPage({
           />
         </AdminPanel>
 
-        <AdminPanel title="热门内容" count={overview.content.length} description="被打开最多的产品与点子详情页">
+        <AdminPanel title="热门内容" count={overview.content.length} description="被打开最多的社区内容详情页">
           <BarList
             rows={overview.content.map((row) => ({
               label: row.title,
-              sublabel: row.type === "product" ? "产品" : "点子",
-              href: `/${row.type === "product" ? "products" : "ideas"}/${row.submissionId}`,
+              sublabel: row.type === "post" ? "社区帖" : row.type === "product" ? "产品" : "点子",
+              href: row.href,
               views: row.views,
               visitors: row.visitors,
             }))}

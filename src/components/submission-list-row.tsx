@@ -19,8 +19,8 @@ export function SubmissionListRow({
 }) {
   const t = useTranslations("submissionRow");
   const locale = useLocale();
-  const href = `/${submission.type === "product" ? "products" : "ideas"}/${submission.id}`;
-  const score = submission.type === "product" ? submission.support_count : submission.votes_paid + submission.votes_creative;
+  const href = `/${submission.type === "post" ? `community/${submission.community_section}/${submission.legacy_slug ?? submission.id}` : `${submission.type === "product" ? "products" : "ideas"}/${submission.id}`}`;
+  const score = submission.type === "post" ? Number(submission.community_like_count ?? 0) : submission.type === "product" ? submission.support_count : submission.votes_paid + submission.votes_creative;
 
   return (
     <Link href={href} className="group flex items-center gap-3 py-3 sm:gap-4">
@@ -41,7 +41,7 @@ export function SubmissionListRow({
                 submission.type === "product" ? "bg-brand-soft text-brand-ink" : "bg-surface-2 text-muted"
               }`}
             >
-              {submission.type === "product" ? t("product") : t("idea")}
+              {submission.type === "product" ? t("product") : submission.type === "post" ? t("post") : t("idea")}
             </span>
           )}
         </h3>
@@ -81,7 +81,7 @@ export function SubmissionListRow({
         <StatBox
           icon={<UpvoteIcon />}
           value={score}
-          title={submission.type === "product" ? t("supports", { count: score }) : t("votes", { count: score })}
+          title={submission.type === "post" ? t("likes", { count: score }) : submission.type === "product" ? t("supports", { count: score }) : t("votes", { count: score })}
         />
       </div>
     </Link>

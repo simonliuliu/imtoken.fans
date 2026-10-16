@@ -142,6 +142,7 @@ export async function revokeContentXp(kind: "comment" | "submission", id: string
   await Promise.all([
     revokeXp({ userId: authorId, action: "submission_product", refId: id }),
     revokeXp({ userId: authorId, action: "submission_idea", refId: id }),
+    revokeXp({ userId: authorId, action: "submission_post", refId: id }),
   ]);
 }
 

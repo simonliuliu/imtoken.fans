@@ -123,7 +123,7 @@ export async function moderateQueueItem(
         action:
           queueItem.target_type === "comment"
             ? "comment_posted"
-            : targetRow.type === "product"
+            : targetRow.type === "post" ? "submission_post" : targetRow.type === "product"
               ? "submission_product"
               : "submission_idea",
         refType: queueItem.target_type,

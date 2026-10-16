@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
+  communityAnalyticsTarget,
   VISITOR_COOKIE,
   VISITOR_COOKIE_MAX_AGE,
   deviceFromUserAgent,
@@ -43,7 +44,9 @@ export async function POST(request: Request) {
   const userAgent = headerList.get("user-agent");
   if (isBotUserAgent(userAgent)) return new NextResponse(null, { status: 204 });
 
-  const { path, route, contentId } = normalizePath(rawPath);
+  const normalized = normalizePath(rawPath);
+  const { path, route } = normalized;
+  let contentId = normalized.contentId;
   // 客户端也过滤了一遍，这里再挡一次：接口是公开的，不能只信调用方。
   if (!isTrackablePath(path)) return new NextResponse(null, { status: 204 });
 
@@ -68,6 +71,19 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const communityTarget = communityAnalyticsTarget(path);
+  if (communityTarget) {
+    // Never trust a client-supplied UUID or map a slug across boards. Only public
+    // post targets can enter content aggregates; hidden/unknown paths stay page views.
+    contentId = null;
+    try {
+      const { data } = await admin.from("submissions").select("id")
+        .eq("type", "post").eq("community_section", communityTarget.section)
+        .eq(communityTarget.isUuid ? "id" : "legacy_slug", communityTarget.identifier)
+        .eq("status", "published").is("deleted_at", null).maybeSingle();
+      contentId = data?.id ?? null;
+    } catch { /* Analytics resolution must not interrupt navigation. */ }
+  }
   const { error } = await admin.from("page_views").insert({
     path: path.slice(0, 300),
     route: route.slice(0, 300),

@@ -3,6 +3,14 @@ export type CommunitySection = (typeof COMMUNITY_SECTIONS)[number];
 export type FeedbackState = "pending" | "discussion" | "recorded";
 export interface DemoPost {
   id: string;
+  submissionId?: string;
+  title?: string;
+  excerpt?: string;
+  body?: string;
+  isExample?: boolean;
+  authorUsername?: string | null;
+  authorId?: string | null;
+  moderationStatus?: "pending" | "published" | "rejected";
   section: CommunitySection;
   category: string;
   author: string;
@@ -45,19 +53,4 @@ export function hasDemoSupport(post: DemoPost) {
 }
 export function compareDemoPopularity(a: DemoPost, b: DemoPost) {
   return b.commentCount - a.commentCount || b.createdAt.localeCompare(a.createdAt);
-}
-
-export interface DemoComment {
-  id: string; body: string; author: string; level: number; likes: number; order: number;
-  parent?: string; local?: boolean;
-}
-// Each visible count corresponds to a rendered seed comment, including replies.
-export function demoSeedComments(post: DemoPost): DemoComment[] {
-  const authors = ["summer", "moss", "lin", "river"];
-  const bodies = ["first", "second", "reply", "note1", "note2", "note3", "note4", "note5", "note6"];
-  return Array.from({ length: post.commentCount }, (_, index) => ({
-    id: `${post.id}-comment-${index}`, body: bodies[index], author: authors[index % authors.length],
-    level: index % 4 + 1, likes: Math.max(0, 8 - index), order: index + 1,
-    ...(index === 2 ? { parent: `${post.id}-comment-0` } : {}),
-  }));
 }
