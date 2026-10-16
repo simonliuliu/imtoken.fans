@@ -1725,7 +1725,10 @@
     "resultCount": "{count} IDEAs",
     "emptyHint": "No feedback matches this view.",
     "progressNotice": "Shows real feedback from the current page. Votes do not directly set priority; community statuses are not official commitments.",
-    "emptyColumn": "No feedback on this page"
+    "emptyColumn": "No feedback on this page",
+    "signInBeforePublish": "Sign in before publishing. You can write first; the button below keeps your draft so you can continue after signing in.",
+    "signInPublish": "Sign in to continue publishing",
+    "similarSearchError": "Similar feedback search is unavailable: {error} You can continue writing."
   },
   "feedbackErrors": {
     "configuration": "The feedback data service is not configured. Contact an admin to connect it and retry.",
