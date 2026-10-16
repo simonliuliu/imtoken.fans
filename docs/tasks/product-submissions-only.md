@@ -24,7 +24,9 @@
 - 用户明确允许重启后，确认旧服务 PID 63534 属于本工作目录，再停止它进行隔离测试。`npx playwright test tests/product-hunter-auth.spec.ts tests/product-submissions-only.spec.ts`：15 项通过（41.6s）；优化手机截图（窄屏重载、单屏捕获）后受影响 5 项再次通过（10.5s）。覆盖中英桌面/手机、旧点子 URL、历史列表无投稿号召、产品草稿兼容、共享会话与登录回跳。测试使用本地虚构账号/API，无真实库写入。
 - 测试结束后恢复正常 `.env.local` 的本地开发服务 `http://localhost:3000`，未改变端口。截图见 [中文桌面](../reviews/screenshots/product-submissions-only/zh-desktop.png)、[中文手机](../reviews/screenshots/product-submissions-only/zh-mobile.png)、[英文桌面](../reviews/screenshots/product-submissions-only/en-desktop.png)、[英文手机](../reviews/screenshots/product-submissions-only/en-mobile.png)。
 - 独立 QA 再次复核四张中英桌面/手机截图与窄屏测试调整，确认无类型切换、无明显裁切/横向溢出，本批无新增问题；恢复正常预览后 `/zh/submit?type=product` HTTP 200。
-- **0026 尚未应用到目标 Supabase**，没有写入或删除线上数据。迁移应用后仍需实际验证 authenticated REST 的 idea 拒绝/product 合法插入及历史读取；只读策略审查不算数据库执行验收。
+- **0026 尚未应用到目标 Supabase**，未执行目标库迁移或更改历史投稿/互动记录；正常预览仍沿用既有访问统计。迁移应用后仍需实际验证 authenticated REST 的 idea 拒绝/product 合法插入及历史读取；只读策略审查不算数据库执行验收。
 - 上一轮提交前两次 fetch 曾遇 GitHub TLS `SSL_ERROR_SYSCALL`，当时保留现场、未绕过同步规则。本轮 fetch 恢复成功，取得的 `origin/main` 仍为 `de69d6c`。
 
 主调度结论：本地页面与行为已验证并恢复正常预览；目标库迁移/实际 REST 验证待执行，交付分支及 PR review，不自动合并主线或宣称线上生效。
+
+交付：实现提交 `3901558` 已推送到本任务分支，[PR #21](https://github.com/simonliuliu/imtoken.fans/pull/21) 已创建，目标 `main`，等待所有者 review/合并。默认推送握手超时后中止，显式 HTTP/1.1 重试成功，未强推。
