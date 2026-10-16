@@ -949,6 +949,13 @@ html {
 .community-filter-row button { flex-shrink: 0; border-radius: 999px; border: 1px solid transparent; padding: 9px 14px; font-size: 12px; min-height: 40px; color: var(--muted); white-space: nowrap; cursor: pointer; }
 .community-filter-row button[aria-pressed=true] { background: #fff0f5; color: var(--brand-ink); }
 .community-filter-row button:hover { background: #f7f8fa; }
+.community-layout.community-board-layout { grid-template-columns: minmax(0, 1fr); }
+.community-category-tabs { border-bottom: 1px solid var(--line); gap: 24px; padding: 0; }
+.community-category-tabs button { min-height: 60px; padding: 12px 0; border-radius: 0; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 600; }
+.community-category-tabs button[aria-pressed=true] { background: transparent; border-bottom-color: var(--brand); color: var(--ink); }
+.community-category-tabs + .community-feed-heading .community-tabs { gap: 20px; }
+.community-category-tabs + .community-feed-heading .community-tabs button { min-height: 48px; border-bottom: 0; font-size: 13px; font-weight: 400; }
+.community-category-tabs + .community-feed-heading .community-tabs button[aria-selected=true] { color: var(--brand-ink); font-weight: 600; }
 .community-status-filter { border-top: 1px dashed var(--line); padding-block: 6px 14px; }
 .community-status-filter > span { flex-shrink: 0; color: var(--faint); font-size: 11px; margin-right: 4px; }
 .community-post-row { display: flex; gap: 32px; align-items: center; border-top: 1px solid var(--line); padding: 24px 0; }
@@ -1148,6 +1155,8 @@ html {
   .community-tabs button { min-height: 54px; font-size: 13px; }
   .community-filter-row { padding-block: 10px; gap: 4px; }
   .community-filter-row button { padding: 8px 11px; font-size: 11px; }
+  .community-filter-row.community-category-tabs { padding: 0; gap: 20px; }
+  .community-category-tabs button { padding: 12px 0; min-height: 52px; font-size: 14px; }
   .community-filter-row > span { font-size: 10px; }
   .community-post-row { display: block; padding: 20px 0; }
   .community-post-author { gap: 6px; font-size: 10px; }

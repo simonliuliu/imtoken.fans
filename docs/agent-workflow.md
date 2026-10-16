@@ -6,6 +6,8 @@
 M1-A2 已完成可预览版本，见 [本批review](reviews/M1-A2-community.md)。Claude设计一次调用，GPT统一实现，本批没有命中必须独立安全QA的真实写入/权限/媒体变更。
 模型与渠道证据见 [模型说明](agent-models.md)。
 
+设计及实现统一遵循 [通用设计规则](design/design-rules.md)。`run-claude-design.py` 每次调用自动读取并附入规则正文，缺失或为空时停止；不依赖 Claude 自行读取仓库。既有规范内的小修正直接由 GPT 实现，无需再次调用 Claude。
+
 ## 1. 当前角色
 
 | 角色 | 模型/强度 | 实现方式 | 主要职责 |

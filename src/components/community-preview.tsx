@@ -1,14 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { DEMO_POSTS, SECTION_CATEGORIES, hasDemoSupport, compareDemoPopularity, demoSeedComments, type DemoComment, type CommunitySection, type DemoPost } from "@/lib/community-demo";
 import { LevelBadge } from "@/components/level-badge";
 import { Avatar } from "@/components/avatar";
 import { TokenPersonasCard } from "@/components/token-personas-card";
-import { CommunityGlyph, ComposeDemoButton } from "@/components/community-elements";
+import { CommunityGlyph } from "@/components/community-elements";
 
 type SortMode = "recommended" | "latest" | "popular";
 const SORTS: SortMode[] = ["recommended", "latest", "popular"];
@@ -38,16 +38,6 @@ function PopularPosts({ section, exclude }: { section?: CommunitySection; exclud
   const t = useTranslations("community");
   const posts = DEMO_POSTS.filter((post) => (!section || post.section === section) && post.id !== exclude).sort(compareDemoPopularity).slice(0, 5);
   return <section className="community-panel"><div className="community-panel-heading"><h2>{t("popularTitle")}</h2></div><ol className="community-popular-list">{posts.map((post, index) => <li key={post.id}><span aria-hidden>{index + 1}</span><Link href={postHref(post)}>{t(`posts.${post.id}.title`)}</Link></li>)}</ol></section>;
-}
-
-function SafetyNote({ inline = false }: { inline?: boolean }) {
-  const t = useTranslations("community");
-  return <section className={`community-panel community-safety-note ${inline ? "community-inline-safety" : ""}`}><h2>{t("safetyTitle")}</h2><ul><li>{t("safetyTip1")}</li><li>{t("safetyTip2")}</li><li>{t("safetyTip3")}</li></ul><Link href="/community/safety/approval-checklist">{t("viewGuide")} <span aria-hidden>›</span></Link></section>;
-}
-
-function ParticipationCard() {
-  const t = useTranslations("community");
-  return <section className="community-panel community-participation"><h2>{t("participate")}</h2><ComposeDemoButton /><Link href="/activities">{t("goCheckin")} <span aria-hidden>↗</span></Link></section>;
 }
 
 function HomeSpotlight() {
@@ -83,10 +73,11 @@ function DemoFeed({ section, productsContent, initialCategory = "all", onCategor
     }
   }
   const filtered = DEMO_POSTS.filter((post) => (!section || post.section === section) && (category === "all" || post.category === category) && (status === "all" || post.status === status) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
-  return <div className={`community-layout ${section === "discussion" ? "community-discussion-layout" : section ? "" : "community-home-layout"}`}>
+  const hasSidebar = !section || section === "discussion";
+  return <div className={`community-layout ${hasSidebar ? section ? "community-discussion-layout" : "community-home-layout" : "community-board-layout"}`}>
     <section className={showProducts ? undefined : "community-panel community-feed-panel"} style={showProducts ? { gridColumn: "1 / -1" } : undefined} aria-label={t("feedLabel")}>
       {!showProducts && <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} /><span>{t("exampleCount", { count: filtered.length })}</span></div>}
-      {section && <div className={`community-filter-row${showProducts ? " community-panel" : ""}`} style={showProducts ? { paddingInline: 16, marginBottom: 20 } : undefined} aria-label={t("categoryFilter")}>
+      {section && <div className={`community-filter-row community-category-tabs${showProducts ? " community-panel" : ""}`} style={showProducts ? { paddingInline: 16, marginBottom: 20 } : undefined} aria-label={t("categoryFilter")}>
         <button type="button" aria-pressed={category === "all"} onClick={() => changeCategory("all")}>{t("all")}</button>
         {SECTION_CATEGORIES[section].map((value) => <button key={value} type="button" aria-pressed={category === value} onClick={() => changeCategory(value)}>{t(`categories.${value}`)}</button>)}
       </div>}
@@ -94,11 +85,11 @@ function DemoFeed({ section, productsContent, initialCategory = "all", onCategor
       {section === "feedback" && <div hidden={!showProducts} style={!showProducts ? { display: "none" } : undefined}>{productsContent}</div>}
       {!showProducts && <>
         {section === "feedback" && category === "wallet" && <div className="community-filter-row community-status-filter" aria-label={t("statusFilter")}><span>{t("statusFilter")}</span>{["all", "pending", "discussion", "recorded"].map((value) => <button key={value} type="button" aria-pressed={status === value} onClick={() => { setStatus(value); setVisible(8); }}>{value === "all" ? t("all") : t(`states.${value}`)}</button>)}</div>}
-        {filtered.length ? <div>{filtered.slice(0, visible).map((post, index) => <Fragment key={post.id}><PostRow post={post} />{index === 3 && !section && <SafetyNote inline />}</Fragment>)}</div> : <div className="community-empty"><CommunityGlyph section={section ?? "discussion"} /><h2>{t("empty")}</h2><button type="button" className="community-button community-button-outline" onClick={() => { changeCategory("all"); setSort("latest"); }}>{t("showAll")}</button></div>}
+        {filtered.length ? <div>{filtered.slice(0, visible).map((post) => <PostRow key={post.id} post={post} />)}</div> : <div className="community-empty"><CommunityGlyph section={section ?? "discussion"} /><h2>{t("empty")}</h2><button type="button" className="community-button community-button-outline" onClick={() => { changeCategory("all"); setSort("latest"); }}>{t("showAll")}</button></div>}
         {filtered.length > visible && <button type="button" className="community-load-more" onClick={() => setVisible((count) => count + 8)}>{t("loadMore")}<span aria-hidden>↓</span></button>}
       </>}
     </section>
-    {!showProducts && <aside className={`community-sidebar community-simple-sidebar ${!section || section === "discussion" ? "community-personas-sidebar" : ""}`}>{!section || section === "discussion" ? <TokenPersonasCard /> : <ParticipationCard />}<SafetyNote /></aside>}
+    {hasSidebar && !showProducts && <aside className="community-sidebar community-simple-sidebar community-personas-sidebar"><TokenPersonasCard /></aside>}
   </div>;
 }
 
@@ -108,9 +99,7 @@ export function CommunityHome() {
 
 export function CommunityBoard({ section, productsContent, initialCategory }: { section: CommunitySection; productsContent?: ReactNode; initialCategory?: string }) {
   const t = useTranslations("community");
-  const [category, setCategory] = useState(initialCategory ?? "all");
-  const showProducts = section === "feedback" && category === "builds";
-  return <div className="community-page" id="main-content" tabIndex={-1}><div className="community-shell"><nav className="community-breadcrumb" aria-label={t("breadcrumb")}><Link href="/">{t("home")}</Link><span aria-hidden>/</span><span>{t(`sections.${section}.name`)}</span></nav><div className="community-board-heading"><span className={`community-entry-icon community-entry-${section}`}><CommunityGlyph section={section} /></span><div><h1>{t(`sections.${section}.name`)}</h1><p>{t(`sections.${section}.description`)}</p></div>{!showProducts && <ComposeDemoButton section={section} />}</div><DemoFeed section={section} productsContent={productsContent} initialCategory={initialCategory} onCategoryChange={setCategory} /></div></div>;
+  return <div className="community-page" id="main-content" tabIndex={-1}><div className="community-shell"><nav className="community-breadcrumb" aria-label={t("breadcrumb")}><Link href="/">{t("home")}</Link><span aria-hidden>/</span><span aria-current="page">{t(`sections.${section}.name`)}</span></nav><h1 className="sr-only">{t(`sections.${section}.name`)}</h1><DemoFeed section={section} productsContent={productsContent} initialCategory={initialCategory} /></div></div>;
 }
 
 function DemoComments({ post, onCountChange }: { post: DemoPost; onCountChange: (count: number) => void }) {
