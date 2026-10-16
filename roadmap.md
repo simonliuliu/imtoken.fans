@@ -231,6 +231,14 @@ PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品�
 
 见 [任务卡](docs/tasks/real-community-interactions.md) 与 [实际验收](docs/reviews/real-community-interactions.md)。虚构正文不等于交互可继续虚构，检查、迁移、PR/发布和用户 review 分别记录。
 
+## 2026-10-16 反馈Review三项修复
+
+在独立`codex/feedback-review-fixes`修复持续草稿/查重回跳、未确认提交固定快照与UUID重试、新增0029数据库JS空白校验。当前表单26项、SQL28项、独立QA额外6项及旧Composer12项通过；1548键i18n、lint、生产Webpack构建与中英桌面/390px、本地虚拟账号登录续写及模拟已保存响应失败→原编号重试无重复通过。正式站与目标库尚未激活0029，不标线上完成；图片/视频明确留下一阶段。见[任务](docs/tasks/feedback-review-fixes.md)及[Review](docs/reviews/feedback-review-fixes.md)，交用户查看本地效果。
+
+## 2026-10-16 PR #25 / #27 整合
+
+反馈持续草稿与原样重试、普通社区真实互动共同整合；迁移重复编号已顺延反馈为0031，保留已执行社区0029/0030。验证、共享库激活与正式部署分别记录于[集成任务](docs/tasks/pr25-27-integration.md)。
+
 ### 普通帖提交入口与其他发布表单补充
 
-继续PR #27修复普通帖明确提交入口，检查产品/Bug建议反馈的校验、网络异常恢复、草稿和会话隔离。1567键中英/lint/build、15项隔离检查及独立QA通过；浏览器和发布状态、已知产品跨窗口并发限制单独记录于 [补充验收](docs/reviews/submission-flow-check.md)。主线旧预览尚未切换，不能把未合入界面称为线上已修复。
+PR #27旧批次已通过PR #29集成，本轮另交补充PR修复普通帖明确提交入口，检查产品/Bug建议反馈的校验、网络异常恢复、草稿和会话隔离。1575键中英/lint/build、当前反馈26项与本批15项隔离检查及独立QA通过；浏览器和发布状态、已知产品跨窗口并发限制单独记录于 [补充验收](docs/reviews/submission-flow-check.md)。本地3000仍为另任务旧预览；补充表单修复尚待review发布。
