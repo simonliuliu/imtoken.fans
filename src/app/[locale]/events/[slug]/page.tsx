@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const event = getCommunityEvent(slug);
   if (!event) return {};
   const copy = await eventCopy(event.key);
-  return { title: `${copy.name} — imAihunt`, description: copy.hook };
+  return { title: `${copy.name} — imToken Fans`, description: copy.hook };
 }
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {

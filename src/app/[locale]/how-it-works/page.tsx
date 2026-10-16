@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { DocsShell, EditorialSection } from "@/components/editorial-page";
+import { DocsShell, EditorialSection, CommunityGuideEntrances } from "@/components/editorial-page";
 
 export async function generateMetadata(): Promise<Metadata> {
   const tMeta = await getTranslations("meta");
@@ -11,6 +11,7 @@ export default async function HowItWorksPage() {
   const t = await getTranslations("howItWorks");
   return (
     <DocsShell eyebrow={t("eyebrow")} title={t("title")} intro={t("intro")}>
+      <CommunityGuideEntrances />
       <EditorialSection title={t("makerTitle")}>
         <Steps items={[t("maker1"), t("maker2"), t("maker3"), t("maker4")]} />
       </EditorialSection>

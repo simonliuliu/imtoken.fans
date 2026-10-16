@@ -7,8 +7,12 @@ import "./globals.css";
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("meta");
   return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+    applicationName: "imToken Fans",
     title: t("homeTitle"),
     description: t("homeDescription"),
+    openGraph: { type: "website", siteName: "imToken Fans" },
+    twitter: { card: "summary_large_image" },
   };
 }
 
