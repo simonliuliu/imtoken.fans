@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 export async function createCommunityPost(input: { expectedUser: string; requestId: string; section: string; category: string; title: string; body: string }) {
   const t = await getTranslations("communityReal");
   const db = await createClient();
+  const { data: auth } = await db.auth.getUser();
+  if (!auth.user) return { error: t("signInAgain"), code: "sign_in" };
+  if (auth.user.id !== input.expectedUser) return { error: t("sessionChanged"), code: "session_changed" };
   const { data, error } = await db.rpc("community_post_create", { p_expected: input.expectedUser, p_request: input.requestId, p_section: input.section, p_category: input.category, p_title: input.title, p_body: input.body });
   if (error || !data) return { error: t("saveFailed") };
   revalidatePath("/[locale]", "layout");

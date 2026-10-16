@@ -29,6 +29,7 @@ function FeedbackForm({ owner }: { owner: string | null }) {
   const router = useRouter();
   const params = useSearchParams();
   const [form, setForm] = useState(blank);
+  const [draftReady, setDraftReady] = useState(false);
   const [error, setError] = useState("");
   const [signInRequired, setSignInRequired] = useState(false);
   const [notice, setNotice] = useState("");
@@ -36,6 +37,7 @@ function FeedbackForm({ owner }: { owner: string | null }) {
   const [similar, setSimilar] = useState<FeedbackPost[]>([]);
   const [similarError, setSimilarError] = useState("");
   const requestId = useRef<string | null>(null);
+  const requestSignature = useRef<string | null>(null);
   const inFlight = useRef(false);
   const errorRegion = useRef<HTMLDivElement>(null);
   const errorId = useId();
@@ -57,11 +59,12 @@ function FeedbackForm({ owner }: { owner: string | null }) {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const saved = takeFeedbackDraft<{ title: string; body: string; module: FeedbackModule; kind?: "bug" | "suggestion"; details?: Record<string, string>; requestId?: string | null }>("idea", owner, params.get("resume") === "1" || params.get("composeFeedback") === "1");
+        const saved = takeFeedbackDraft<{ title: string; body: string; module: FeedbackModule; kind?: "bug" | "suggestion"; details?: Record<string, string>; requestId?: string | null; requestSignature?: string | null }>("idea", owner, params.get("resume") === "1" || params.get("composeFeedback") === "1");
         if (saved && typeof saved.title === "string" && typeof saved.body === "string" && FEEDBACK_MODULES.includes(saved.module)) {
-          setForm({ title: saved.title, body: saved.body, module: saved.module, kind: saved.kind === "suggestion" ? "suggestion" : "bug", details: saved.details && typeof saved.details === "object" ? saved.details : {} }); requestId.current = saved.requestId ?? null;
+          setForm({ title: saved.title, body: saved.body, module: saved.module, kind: saved.kind === "suggestion" ? "suggestion" : "bug", details: saved.details && typeof saved.details === "object" ? Object.fromEntries(Object.entries(saved.details).filter(([, value]) => typeof value === "string")) : {} }); requestId.current = saved.requestId ?? null; requestSignature.current = saved.requestSignature ?? null;
         }
       } catch { setError(f("draftUnavailable")); }
+      finally { setDraftReady(true); }
     }, 0);
     return () => window.clearTimeout(timer);
   // A draft is consumed once for this account/session mount.
@@ -82,27 +85,36 @@ function FeedbackForm({ owner }: { owner: string | null }) {
     }, 350);
     return () => { stale = true; clearTimeout(timer); };
   }, [form.title, owner, f]);
+  useEffect(() => {
+    if (!draftReady) return;
+    try { saveFeedbackDraft("idea", owner, { ...form, requestId: requestId.current, requestSignature: requestSignature.current }); }
+    catch { /* Explicit login handoff below reports storage failures. */ }
+  }, [draftReady, form, owner]);
   const signInHref = getSignInHref("/submit/feedback?resume=1", locale);
   const setDetail = (key: string, value: string) => setForm((valueBefore) => ({ ...valueBefore, details: { ...valueBefore.details, [key]: value } }));
   function serializedDescription() {
     const names = form.kind === "bug" ? ["appVersion", "device", "steps", "expected", "actual"] : ["scenario", "proposal", "impact"];
-    const detailText = names.filter((key) => form.details[key]?.trim()).map((key) => `${t(`fields.${key}`)}: ${key === "device" ? t(`deviceOptions.${form.details[key]}`) : form.details[key].trim()}`).join("\n\n");
+    const detailText = names.filter((key) => form.details[key]?.trim()).map((key) => `${t(`fields.${key}`)}: ${key === "device" && ["ios", "android", "browserExtension", "other"].includes(form.details[key]) ? t(`deviceOptions.${form.details[key]}`) : form.details[key].trim()}`).join("\n\n");
     const kindLabel = t(form.kind === "bug" ? "bugType" : "suggestionType");
     return `${kindLabel}\n\n${form.body.trim()}${detailText ? `\n\n${detailText}` : ""}`;
   }
   function continueSignIn() {
-    try { saveFeedbackDraft("idea", owner, { ...form, requestId: requestId.current }); }
+    try { saveFeedbackDraft("idea", owner, { ...form, requestId: requestId.current, requestSignature: requestSignature.current }); }
     catch { showError(f("draftUnavailable")); return; }
     router.push(signInHref);
   }
   async function submit(event: FormEvent) {
     event.preventDefault(); if (inFlight.current) return;
+    if (!draftReady) return;
     if (needsLogin) { continueSignIn(); return; }
+    if (form.title.trim().length < 2 || form.body.trim().length < 2) { showError(t("feedbackRequirements")); return; }
     const description = serializedDescription();
     if (description.length > 5000) { showError(t("descriptionTooLong", { count: description.length })); return; }
     inFlight.current = true; setBusy(true); setError(""); setNotice("");
     try {
-      requestId.current ??= crypto.randomUUID();
+      const signature = JSON.stringify({ title: form.title, description, module: form.module });
+      if (requestSignature.current !== signature) { requestId.current = crypto.randomUUID(); requestSignature.current = signature; }
+      try { saveFeedbackDraft("idea", owner, { ...form, requestId: requestId.current, requestSignature: requestSignature.current }); } catch { /* Keep the in-memory request for retry. */ }
       const result = await writeFeedback("create", { id: requestId.current, title: form.title, description, module: form.module, expected_user_id: owner });
       if (!mounted.current) return;
       if (!result.ok) { showError(result.error, result.code === "sign_in"); return; }
@@ -127,7 +139,7 @@ function FeedbackForm({ owner }: { owner: string | null }) {
     {notice && <p role="status" className="community-local-status">{notice}</p>}
     {similarError && <p role="status" className="community-local-status">{similarError}</p>}
     {matchingIdeas.length > 0 && <section aria-label={c("similarHeading")} className="community-panel p-4"><h2>{c("similarHeading")}</h2>{matchingIdeas.map((item) => <p key={item.id}><Link href={`/community/feedback?category=wallet&idea=${item.id}`}>{item.title}</Link></p>)}</section>}
-    <form className="community-panel community-submit-form" onSubmit={submit}>
+    <form className="community-panel community-submit-form" onSubmit={submit} aria-busy={busy}>
       <fieldset className="community-feedback-kind"><legend>{t("feedbackKindLabel")}</legend>
         {(["bug", "suggestion"] as const).map((kind) => <button type="button" key={kind} aria-pressed={form.kind === kind} disabled={busy} onClick={() => update({ kind })}><strong>{t(kind === "bug" ? "bugType" : "suggestionType")}</strong><small>{t(kind === "bug" ? "bugTypeHelp" : "suggestionTypeHelp")}</small></button>)}
       </fieldset>
@@ -137,9 +149,10 @@ function FeedbackForm({ owner }: { owner: string | null }) {
       {form.kind === "bug" ? <div className="community-feedback-fields"><label>{t("fields.appVersion")}<input disabled={busy} value={form.details.appVersion ?? ""} onChange={(event) => setDetail("appVersion", event.target.value)} placeholder={t("placeholders.appVersion")} /></label><label>{t("fields.device")}<select disabled={busy} value={form.details.device ?? ""} onChange={(event) => setDetail("device", event.target.value)}><option value="">{t("chooseOne")}</option>{["ios", "android", "browserExtension", "other"].map((value) => <option key={value} value={value}>{t(`deviceOptions.${value}`)}</option>)}</select></label><label className="community-field-wide">{t("fields.steps")}<textarea disabled={busy} rows={3} value={form.details.steps ?? ""} onChange={(event) => setDetail("steps", event.target.value)} placeholder={t("placeholders.steps")} /></label><label>{t("fields.expected")}<textarea disabled={busy} rows={3} value={form.details.expected ?? ""} onChange={(event) => setDetail("expected", event.target.value)} /></label><label>{t("fields.actual")}<textarea disabled={busy} rows={3} value={form.details.actual ?? ""} onChange={(event) => setDetail("actual", event.target.value)} /></label></div> : <div className="community-feedback-fields"><label>{t("fields.scenario")}<textarea disabled={busy} rows={3} value={form.details.scenario ?? ""} onChange={(event) => setDetail("scenario", event.target.value)} placeholder={t("placeholders.scenario")} /></label><label>{t("fields.proposal")}<textarea disabled={busy} rows={3} value={form.details.proposal ?? ""} onChange={(event) => setDetail("proposal", event.target.value)} placeholder={t("placeholders.proposal")} /></label><label className="community-field-wide">{t("fields.impact")}<textarea disabled={busy} rows={3} value={form.details.impact ?? ""} onChange={(event) => setDetail("impact", event.target.value)} placeholder={t("placeholders.impact")} /></label></div>}
       <p className="community-local-status" aria-live="polite">{t("feedbackLength", { count: descriptionLength })}</p>
       <div className="community-submit-privacy"><strong>{t("privacyTitle")}</strong><p>{t("privacyBody")}</p></div>
+      <p className="community-local-status">{t("feedbackRequirements")}</p>
       {needsLogin && <p role="status" className={styles.loginNotice}>{f("signInBeforePublish")}</p>}
       {error && <div id={errorId} ref={errorRegion} role="alert" tabIndex={-1} className={styles.submitError}><p>{error}</p></div>}
-      <button type={needsLogin ? "button" : "submit"} onClick={needsLogin ? continueSignIn : undefined} aria-describedby={error ? errorId : undefined} className="community-button" disabled={busy || !needsLogin && (form.title.trim().length < 2 || form.body.trim().length < 2 || descriptionLength > 5000)}>{busy ? f("saving") : needsLogin ? f("signInPublish") : t("publishFeedback")}</button>
+      <button type={needsLogin ? "button" : "submit"} onClick={needsLogin ? continueSignIn : undefined} aria-describedby={error ? errorId : undefined} className="community-button" disabled={busy || !draftReady}>{busy ? f("saving") : needsLogin ? f("signInPublish") : t("publishFeedback")}</button>
     </form>
   </div></div>;
 }

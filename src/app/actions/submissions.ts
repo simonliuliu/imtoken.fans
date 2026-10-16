@@ -28,6 +28,7 @@ import type {
 
 export interface CreateSubmissionInput {
   type: "product";
+  expectedUser?: string;
   title: string;
   tagline: string;
   description: string;
@@ -57,7 +58,7 @@ function isValidHttpUrl(value: string): boolean {
 
 export async function createSubmission(
   input: CreateSubmissionInput
-): Promise<{ error: string } | { submissionId: string; published: boolean }> {
+): Promise<{ error: string; code?: "sign_in" | "session_changed" } | { submissionId: string; published: boolean }> {
   const t = await getTranslations("errors");
   // Old clients and direct Server Action requests must not reopen idea submissions.
   if (!input || input.type !== "product") return { error: t("productSubmissionsOnly") };
@@ -103,7 +104,8 @@ export async function createSubmission(
   }
 
   const profile = await getCurrentProfile();
-  if (!profile) return { error: t("notSignedIn") };
+  if (!profile) return { error: t("notSignedIn"), code: "sign_in" };
+  if (input.expectedUser && profile.id !== input.expectedUser) return { error: t("submissionSessionChanged"), code: "session_changed" };
 
   const logoPath = input.logoPath?.trim() || null;
   if (logoPath && !logoPath.startsWith(`${profile.id}/`)) {

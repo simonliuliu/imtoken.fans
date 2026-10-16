@@ -723,7 +723,13 @@
     "draftSaved": "Draft automatically saved on this device",
     "draftLoading": "Restoring draft…",
     "socialPlatform": "Platform, e.g. Twitter",
-    "addLink": "+ Add link"
+    "addLink": "+ Add link",
+    "missingRequired": "Complete the required fields: {fields}",
+    "unexpectedError": "Could not confirm the result. Check My submissions before retrying. Your draft is kept.",
+    "draftUnavailable": "Could not save your draft in this browser. Copy your content as a backup.",
+    "signInRequired": "Sign in to submit a product. Saved drafts are restored only to their original account.",
+    "signInPublish": "Sign in to submit a product",
+    "operationError": "The operation failed. Please try again."
   },
   "profile": {
     "signInTitle": "Sign in to view your profile",
@@ -1058,7 +1064,8 @@
     "nonceVerifyFailed": "Challenge verification failed",
     "nonceExpired": "The challenge code expired or is missing — reconnect your wallet",
     "signatureInvalid": "Signature verification failed — make sure you're using the same wallet address",
-    "tokenCreateFailed": "Could not create a sign-in token"
+    "tokenCreateFailed": "Could not create a sign-in token",
+    "submissionSessionChanged": "Your account changed. Return to the original account to submit."
   },
   "activityErrors": {
     "checkinDisabled": "Check-in isn't open yet",
@@ -1210,7 +1217,8 @@
     "bodyPlaceholder": "Add context, what you observed, and what you want to discuss. Use fictional examples and protect sensitive wallet information.",
     "bugDescriptionPlaceholder": "Describe the unexpected behavior and how it affects you.",
     "suggestionDescriptionPlaceholder": "Describe what feels difficult today and what you would improve.",
-    "descriptionTooLong": "The complete feedback is {count} characters; the maximum is 5,000."
+    "descriptionTooLong": "The complete feedback is {count} characters; the maximum is 5,000.",
+    "feedbackRequirements": "Title and description each need at least 2 characters. Extra details are optional; the complete description allows up to 5,000 characters."
   },
   "community": {
     "demoCommunity": "Community preview",
@@ -1811,6 +1819,11 @@
     "postIntro": "Share wallet experiences, questions and community discussions. A moderator reviews posts before publication.",
     "publish": "Submit for review",
     "saving": "Saving…",
-    "privateContent": "Sign in with the author account to view this content."
+    "privateContent": "Sign in with the author account to view this content.",
+    "postRequirements": "Enter a title (2–80 characters) and body (10–5,000 characters).",
+    "signInAgain": "Sign in to submit. Use the original account when signing in again to continue your draft.",
+    "signInPublish": "Sign in to submit",
+    "draftUnavailable": "Could not save the draft. Copy your text before trying to sign in.",
+    "sessionChanged": "Your account changed. Return to the original account to continue."
   }
 }

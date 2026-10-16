@@ -723,7 +723,13 @@
     "draftSaved": "草稿已自动保存在这台设备上",
     "draftLoading": "正在恢复草稿…",
     "socialPlatform": "平台，例如 Twitter",
-    "addLink": "+ 添加链接"
+    "addLink": "+ 添加链接",
+    "missingRequired": "请补全必填项：{fields}",
+    "unexpectedError": "未能确认提交结果，请检查我的投稿后再重试，草稿会保留。",
+    "draftUnavailable": "草稿未能保存到浏览器，请复制内容备份。",
+    "signInRequired": "请先登录后提交产品；已保存草稿只会恢复到原账号。",
+    "signInPublish": "登录后提交产品",
+    "operationError": "操作失败，请重试。"
   },
   "profile": {
     "signInTitle": "登录后查看个人主页",
@@ -1058,7 +1064,8 @@
     "nonceVerifyFailed": "验证码校验失败",
     "nonceExpired": "验证码已过期或不存在，请重新连接钱包",
     "signatureInvalid": "签名验证失败，请确认使用的是同一个钱包地址",
-    "tokenCreateFailed": "生成登录令牌失败"
+    "tokenCreateFailed": "生成登录令牌失败",
+    "submissionSessionChanged": "账号已变化，请回到原账号后继续提交。"
   },
   "activityErrors": {
     "checkinDisabled": "签到暂未开放",
@@ -1210,7 +1217,8 @@
     "bodyPlaceholder": "说明背景、你的观察和希望交流的问题。请使用虚构示例并保护钱包敏感信息。",
     "bugDescriptionPlaceholder": "描述遇到的异常，以及它对你造成的影响。",
     "suggestionDescriptionPlaceholder": "说明目前哪里不顺手，以及你希望改善什么。",
-    "descriptionTooLong": "完整反馈共 {count} 字，最多 5000 字。"
+    "descriptionTooLong": "完整反馈共 {count} 字，最多 5000 字。",
+    "feedbackRequirements": "标题和问题描述至少各 2 个字；补充信息为选填，完整描述最多 5000 字。"
   },
   "community": {
     "demoCommunity": "演示社区",
@@ -1811,6 +1819,11 @@
     "postIntro": "分享钱包经验、问题与社区讨论。提交后由管理员审核公开。",
     "publish": "提交审核",
     "saving": "正在保存…",
-    "privateContent": "请使用发布账号查看此内容。"
+    "privateContent": "请使用发布账号查看此内容。",
+    "postRequirements": "请填写标题（2–80 字）和正文（10–5000 字）。",
+    "signInAgain": "登录后即可提交；重新登录请使用原账号以继续草稿。",
+    "signInPublish": "登录后提交",
+    "draftUnavailable": "无法保存草稿，请先复制内容，再尝试登录。",
+    "sessionChanged": "账号已变化，请回到原账号后继续。"
   }
 }

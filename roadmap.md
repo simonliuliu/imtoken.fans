@@ -230,3 +230,7 @@ PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品�
 - [ ] 本批PR合入及应用发布；当前线上普通社区仍是旧演示界面，待用户review。
 
 见 [任务卡](docs/tasks/real-community-interactions.md) 与 [实际验收](docs/reviews/real-community-interactions.md)。虚构正文不等于交互可继续虚构，检查、迁移、PR/发布和用户 review 分别记录。
+
+### 普通帖提交入口与其他发布表单补充
+
+继续PR #27修复普通帖明确提交入口，检查产品/Bug建议反馈的校验、网络异常恢复、草稿和会话隔离。1567键中英/lint/build、15项隔离检查及独立QA通过；浏览器和发布状态、已知产品跨窗口并发限制单独记录于 [补充验收](docs/reviews/submission-flow-check.md)。主线旧预览尚未切换，不能把未合入界面称为线上已修复。
