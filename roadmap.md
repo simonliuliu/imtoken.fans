@@ -152,6 +152,8 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 
 ## 最新执行记录
 
+2026-10-16 首页 bman Agent 入口：从 bman `presets/agents.yaml` 同步 ZEC、NEAR、牛来、TRON 的公开名称与头像，四项分别直达 `/agents/$symbol`；首页桌面 2×2、手机 4 列，综合交流原五个占位预览不变。1580 键 i18n、lint、build、四头像 HTTP/浏览器加载、中文 1440/390 无溢出与讨论页回归通过；匿名详情访问仍受 Cloudflare Access 302 保护，未绕过登录验证。见[任务](docs/tasks/M1-token-personas-bman-agents.md)与[review](docs/reviews/M1-token-personas-bman-agents.md)。
+
 2026-10-16 Product Hunter 登录体验：在 `codex/product-hunter-auth-ux` 修复会话加载误判、统一投稿/支持/评分/评论登录入口与多语言回跳、账号切换和个人状态刷新；10 条本地模拟浏览器回归、i18n（1249 键）、lint、build 与独立 QA 通过。真实外部登录/数据库未验；不包含旧审核/RLS与草稿问题修复，见 [review](docs/reviews/product-hunter-auth-ux.md)。
 2026-10-16 Jack反馈真实接入：合入最新main67a5b53登录/数据库安全修复，新增0025反馈专用迁移及RPC；统一「发帖」产品反馈模块字段，真实Admin编辑/审计、IDEA和评论支持、合并/撤销持久化契约；移除虚构IDEA种子及假管理员入口。i18n1432键、lint、tsc、Webpack构建、主线6项安全回归、模拟PG71项及独立会话/草稿审查通过；浏览器表单/缺配置失败路径/手机通过。目标Supabase0025未执行，真实账号保存刷新和多连接并发待部署验证；通知/视频/旧审核队列未接，不标完整M3验收，见[任务记录](docs/tasks/product-feedback-persistence.md)。
 

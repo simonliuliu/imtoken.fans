@@ -4,9 +4,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { BMAN_HOME_AGENTS, bmanAgentProfileHref } from "@/lib/bman-agents";
 
-const PERSONAS = ["btc", "eth", "near", "zec", "niulai"] as const;
-type Persona = (typeof PERSONAS)[number];
+const PREVIEW_PERSONAS = ["btc", "eth", "near", "zec", "niulai"] as const;
+type PreviewPersona = (typeof PREVIEW_PERSONAS)[number];
 
 export function TokenPersonasCard({ external = false }: { external?: boolean }) {
   const t = useTranslations("tokenPersonas");
@@ -14,7 +15,7 @@ export function TokenPersonasCard({ external = false }: { external?: boolean }) 
   const descriptionId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
-  const [selected, setSelected] = useState<Persona | null>(null);
+  const [selected, setSelected] = useState<PreviewPersona | null>(null);
 
   useEffect(() => {
     if (selected && dialog.current && !dialog.current.open) dialog.current.showModal();
@@ -23,18 +24,23 @@ export function TokenPersonasCard({ external = false }: { external?: boolean }) 
   function close() { dialog.current?.close(); }
 
   return (
-    <section className="community-panel token-personas-card">
+    <section className={`community-panel token-personas-card${external ? " token-personas-card-external" : ""}`}>
       <h2>{t("title")}</h2>
       <div className="token-personas-grid">
-        {PERSONAS.map((persona) => (
-          external ? <a key={persona} href="https://bman.buidl4.top/c/general" aria-label={t("visitPersona", { name: t(`characters.${persona}.name`) })}>
-            <Image src={`/images/token-personas/${persona}.png`} width={72} height={72} sizes="64px" alt="" />
-            <span>{t(`characters.${persona}.name`)}</span>
-          </a> : <button type="button" key={persona} aria-haspopup="dialog" aria-label={t("openPersona", { name: t(`characters.${persona}.name`) })} onClick={(event) => { trigger.current = event.currentTarget; setSelected(persona); }}>
-            <Image src={`/images/token-personas/${persona}.png`} width={72} height={72} sizes="64px" alt="" />
-            <span>{t(`characters.${persona}.name`)}</span>
-          </button>
-        ))}
+        {external
+          ? BMAN_HOME_AGENTS.map((agent) => {
+              const name = t(`agents.${agent.id}`);
+              return <a key={agent.id} href={bmanAgentProfileHref(agent.routeSymbol)} aria-label={t("visitAgent", { name })}>
+                <Image src={agent.avatarUrl} width={72} height={72} sizes="64px" alt="" unoptimized />
+                <span>{name}</span>
+              </a>;
+            })
+          : PREVIEW_PERSONAS.map((persona) => (
+              <button type="button" key={persona} aria-haspopup="dialog" aria-label={t("openPersona", { name: t(`characters.${persona}.name`) })} onClick={(event) => { trigger.current = event.currentTarget; setSelected(persona); }}>
+                <Image src={`/images/token-personas/${persona}.png`} width={72} height={72} sizes="64px" alt="" />
+                <span>{t(`characters.${persona}.name`)}</span>
+              </button>
+            ))}
       </div>
       <p className="token-personas-footnote">{t(external ? "externalNotice" : "previewLabel")}</p>
       <dialog ref={dialog} className="token-persona-dialog" aria-labelledby={titleId} aria-describedby={descriptionId} onClose={() => { setSelected(null); trigger.current?.focus(); }} onClick={(event) => { if (event.target === dialog.current) close(); }}>

@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       // Supabase Storage（后续存放用户上传的图片 / 产品截图）
       { protocol: "https", hostname: "*.supabase.co" },
+      // bman 预设 Agent 头像，只允许公开 Agent 资源目录
+      { protocol: "https", hostname: "bman-assets.buidl4.top", port: "", pathname: "/agents/**", search: "" },
+      // TRON 预设 Agent 当前使用的精确头像路径
+      { protocol: "https", hostname: "cryptologos.cc", port: "", pathname: "/logos/tron-trx-logo.png", search: "" },
     ],
   },
 };
