@@ -113,4 +113,47 @@ alter table public.feedback_posts
 alter table public.feedback_comments
   add constraint feedback_comments_review_body_check check (char_length(public.feedback_text_trim(body)) between 2 and 2000) not valid;
 
+-- Parent publication rechecks must not rewrite legacy invalid child rows.
+-- Their event ledger remains intact; valid comments keep the existing fanout.
+create or replace function public.emit_content_notification() returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_key text; v_actor uuid; v_author uuid; v_parent uuid; v_body text; v_submission uuid; v_comment uuid; v_feedback uuid; v_fc uuid; v_kind text; v_inserted integer;
+begin
+ if tg_table_name='submissions' then
+  if new.status<>'published' or new.deleted_at is not null then return new; end if;
+  v_actor:=new.submitted_by; v_submission:=new.id; v_kind:='follow_post';
+ elsif tg_table_name='comments' then
+  if new.status<>'published' or new.deleted_at is not null or not exists(select 1 from submissions where id=new.submission_id and status='published' and deleted_at is null) then return new; end if;
+  v_actor:=new.user_id; v_submission:=new.submission_id; v_comment:=new.id; v_body:=new.body; v_kind:='follow_comment';
+  if new.parent_id is null then select submitted_by into v_author from submissions where id=new.submission_id;
+  else select user_id into v_parent from comments where id=new.parent_id and submission_id=new.submission_id and status='published' and deleted_at is null; end if;
+ elsif tg_table_name='feedback_posts' then
+  if new.visibility<>'published' then return new; end if;
+  v_actor:=new.author_id; v_feedback:=new.id; v_kind:='follow_post';
+ else
+  if new.visibility<>'published' or not exists(select 1 from feedback_posts where id=new.post_id and visibility='published') then return new; end if;
+  v_actor:=new.author_id; v_feedback:=new.post_id; v_fc:=new.id; v_body:=new.body; v_kind:='follow_comment';
+  if new.parent_id is null then select author_id into v_author from feedback_posts where id=new.post_id;
+  else select author_id into v_parent from feedback_comments where id=new.parent_id and visibility='published' and feedback_root(post_id)=feedback_root(new.post_id); end if;
+ end if;
+ if tg_table_name='comments' then select submitted_by into v_author from submissions where id=v_submission;
+ elsif tg_table_name='feedback_comments' then select author_id into v_author from feedback_posts where id=v_feedback; end if;
+ v_key:=tg_table_name||':'||new.id;
+ insert into notification_events(event_key) values(v_key) on conflict do nothing;
+ get diagnostics v_inserted=row_count;
+ if tg_table_name='submissions' then update comments set status=status where submission_id=new.id and status='published' and deleted_at is null;
+ elsif tg_table_name='feedback_posts' then update feedback_comments set visibility=visibility where post_id=new.id and visibility='published' and char_length(btrim(body, U&'\0009\000A\000B\000C\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF')) between 2 and 2000; end if;
+ if v_inserted=0 then return new; end if;
+ -- One recipient per event. Direct replies take priority over mentions and follows.
+ insert into notifications(user_id,actor_id,type,submission_id,comment_id,feedback_post_id,feedback_comment_id,event_key,detail)
+ select recipient,v_actor,case when priority=2 then 'mention'::notification_type else 'reply'::notification_type end,v_submission,v_comment,v_feedback,v_fc,v_key,jsonb_build_object('kind',case when priority=1 then 'reply' when priority=2 then 'mention' else v_kind end)
+ from (select recipient,min(priority) priority from (
+  select v_author recipient,1 priority
+  union all select v_parent,1
+  union all select p.id,2 from profiles p where v_body is not null and lower(p.username) in (select lower(m[2]) from regexp_matches(v_body,'(^|[^a-zA-Z0-9_@.])@([a-zA-Z0-9_]{3,20})(?![a-zA-Z0-9_])','g') m)
+  union all select follower_id,3 from user_follows where followed_id=v_actor and (case when v_kind='follow_post' then notify_posts else notify_comments end)
+ ) candidates where recipient is not null and recipient is distinct from v_actor group by recipient) recipients
+ on conflict(user_id,event_key) where event_key is not null do nothing;
+ return new;
+end; $$;
+
 commit;
