@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FEEDBACK_CHANGED } from "@/lib/feedback";
+import { CoCreationFeedContext } from "@/components/co-creation-feed-context";
 import { CooperationPreview } from "@/components/cooperation-preview";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -59,7 +60,6 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
   const t = useTranslations("community");
   const [sort, setSort] = useState<SortMode>(section ? "latest" : "recommended");
   const [category, setCategory] = useState(() => section && SECTION_CATEGORIES[section].includes(initialCategory) ? initialCategory : "all");
-  const [status, setStatus] = useState("all");
   const [visible, setVisible] = useState(8);
   const showProducts = section === "feedback" && category === "builds";
   const showFeedback = section === "feedback" && category === "wallet";
@@ -72,7 +72,6 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
   function changeCategory(next: string) {
     setCategory(next);
     onCategoryChange?.(next);
-    setStatus("all");
     setVisible(8);
     if (section) {
       const url = new URL(window.location.href);
@@ -81,23 +80,26 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
       window.history.replaceState(null, "", url);
     }
   }
-  const filtered = DEMO_POSTS.filter((post) => !(post.section === "feedback" && post.category === "wallet") && (!section || post.section === section) && (category === "all" || post.category === category) && (status === "all" || post.status === status) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
+  const filtered = DEMO_POSTS.filter((post) => !(post.section === "feedback" && (post.category === "wallet" || (section === "feedback" && post.category === "builds"))) && (!section || post.section === section) && (category === "all" || post.category === category) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
   const hasSidebar = !section || section === "discussion";
   return <div className={`community-layout ${hasSidebar ? section ? "community-discussion-layout" : "community-home-layout" : "community-board-layout"}`}>
-    <section className={showProducts || showFeedback ? undefined : "community-panel community-feed-panel"} style={showProducts || showFeedback ? { gridColumn: "1 / -1" } : undefined} aria-label={t("feedLabel")}>
-      {!showProducts && !showFeedback && <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} /><span>{t("exampleCount", { count: filtered.length })}</span></div>}
-      {section && <div className={`community-filter-row community-category-tabs${showProducts ? " community-panel" : ""}`} style={showProducts ? { paddingInline: 16, marginBottom: 20 } : undefined} aria-label={t("categoryFilter")}>
+    <section className="community-panel community-feed-panel" aria-label={t("feedLabel")}>
+      {section && <div className="community-filter-row community-category-tabs" aria-label={t("categoryFilter")}>
         <button type="button" aria-pressed={category === "all"} onClick={() => changeCategory("all")}>{t("all")}</button>
         {SECTION_CATEGORIES[section].map((value) => <button key={value} type="button" aria-pressed={category === value} onClick={() => changeCategory(value)}>{t(`categories.${value}`)}</button>)}
       </div>}
-      {/* Keep the explorer mounted so switching forum categories preserves its filters. */}
-      {section === "feedback" && <div hidden={!showProducts} style={!showProducts ? { display: "none" } : undefined}>{productsContent}</div>}
-      {section === "feedback" && <div hidden={!showFeedback}><CooperationPreview embedded initialId={initialId} /></div>}
-      {!showProducts && !showFeedback && <>
-        {section === "feedback" && category === "wallet" && <div className="community-filter-row community-status-filter" aria-label={t("statusFilter")}><span>{t("statusFilter")}</span>{["all", "pending", "discussion", "recorded"].map((value) => <button key={value} type="button" aria-pressed={status === value} onClick={() => { setStatus(value); setVisible(8); }}>{value === "all" ? t("all") : t(`states.${value}`)}</button>)}</div>}
-        {filtered.length ? <div>{filtered.slice(0, visible).map((post) => <PostRow key={post.id} post={post} />)}</div> : <div className="community-empty"><CommunityGlyph section={section ?? "discussion"} /><h2>{t("empty")}</h2><button type="button" className="community-button community-button-outline" onClick={() => { changeCategory("all"); setSort("latest"); }}>{t("showAll")}</button></div>}
-        {filtered.length > visible && <button type="button" className="community-load-more" onClick={() => setVisible((count) => count + 8)}>{t("loadMore")}<span aria-hidden>↓</span></button>}
-      </>}
+      <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} />{section !== "feedback" && <span>{t("exampleCount", { count: filtered.length })}</span>}</div>
+      <CoCreationFeedContext.Provider value={{ sort, category }}>
+        {section === "feedback" && <>
+          <div hidden={category !== "all" && !showFeedback}><CooperationPreview embedded initialId={initialId} sort={sort} overview={category === "all"} onOpen={() => changeCategory("wallet")} /></div>
+          <div hidden={category !== "all" && !showProducts}>{productsContent}</div>
+        </>}
+        {!showProducts && !showFeedback && <>
+          {section === "feedback" && category === "all" && <h2 className="border-b border-line py-4 text-sm font-semibold text-muted">{t("categories.changelog")}</h2>}
+          {filtered.length ? <div>{filtered.slice(0, visible).map((post) => <PostRow key={post.id} post={post} />)}</div> : <div className="community-empty"><CommunityGlyph section={section ?? "discussion"} /><h2>{t("empty")}</h2><button type="button" className="community-button community-button-outline" onClick={() => { changeCategory("all"); setSort("latest"); }}>{t("showAll")}</button></div>}
+          {filtered.length > visible && <button type="button" className="community-load-more" onClick={() => setVisible((count) => count + 8)}>{t("loadMore")}<span aria-hidden>↓</span></button>}
+        </>}
+      </CoCreationFeedContext.Provider>
     </section>
     {hasSidebar && !showProducts && <aside className="community-sidebar community-simple-sidebar community-personas-sidebar"><TokenPersonasCard external={!section} /></aside>}
   </div>;

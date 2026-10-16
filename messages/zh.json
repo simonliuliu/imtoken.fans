@@ -22,7 +22,7 @@
     "about": "关于",
     "leaderboard": "排行榜",
     "activities": "活动",
-    "submit": "提交",
+    "submit": "发布",
     "signIn": "登录",
     "accountMenu": "账号菜单",
     "profile": "个人主页",
@@ -384,7 +384,9 @@
     "ratingMetric": "评分",
     "supportMetric": "支持",
     "ratingCount": "{count} 条评分",
-    "commentCount": "{count} 条评论"
+    "commentCount": "{count} 条评论",
+    "recommendedEmptyTitle": "暂无推荐产品",
+    "recommendedEmptyBody": "切换到最新或热门查看社区产品。"
   },
   "productRating": {
     "supportEyebrow": "社区支持",
@@ -1495,7 +1497,7 @@
     "descriptionLabel": "详细描述",
     "titlePlaceholder": "你希望改善什么？",
     "descriptionPlaceholder": "描述你的使用场景、遇到的问题和期待的体验。",
-    "similarHeading": "可能已有相似 IDEA",
+    "similarHeading": "可能已有相似反馈",
     "keywordOnly": "按标题关键词匹配，仅供参考，不是 AI 判断。",
     "noSimilar": "暂未找到关键词相似的示例，你可以继续提交。",
     "safety": "请勿填写助记词、私钥或密码。真实版本将支持图片与视频文件，本原型不上传附件。",
@@ -1514,7 +1516,7 @@
     "allStates": "全部状态",
     "sortLabel": "排序",
     "resultCount": "{count} 个 IDEA · 示例数据",
-    "empty": "没有符合条件的 IDEA",
+    "empty": "暂无符合条件的反馈",
     "emptyHint": "试试其他关键词或清除筛选。",
     "clearFilters": "清除筛选",
     "emptyColumn": "暂无示例",
@@ -1630,13 +1632,13 @@
     "sessionChanged": "登录状态已变化，请等待会话刷新后重新读取。",
     "close": "关闭发帖",
     "allEntry": "查看社区真实提交的产品反馈、支持与讨论。",
-    "heading": "产品反馈 · IDEA",
+    "heading": "产品反馈",
     "intro": "提交真实使用诉求，投票和讨论。处理状态由社区管理员整理，不代表官方排期。",
-    "publish": "发布 IDEA",
+    "publish": "发布反馈",
     "composeTitle": "发布产品反馈",
     "titleField": "标题（2–120 字）",
     "bodyField": "详细描述（2–5000 字）",
-    "publishNotice": "产品共创 → 产品反馈将真实发布并保存到本站。其他内容类型仍为预览。反馈公开可见，管理员可整理或隐藏不合适的内容。",
+    "publishNotice": "反馈公开可见，管理员可整理或隐藏不合适的内容。",
     "safety": "请勿填写助记词、私钥、密码或其他敏感信息。本批表单暂不支持附件上传。",
     "saving": "正在保存…",
     "saved": "已保存到服务器。",
@@ -1673,7 +1675,7 @@
     "pageCount": "第 {page} / {pages} 页",
     "commentPage": "评论 {start}–{end}，共 {count} 条",
     "resultCount": "共 {count} 个 IDEA",
-    "emptyHint": "目前没有符合条件的真实反馈。清除筛选或发布你的第一个 IDEA。",
+    "emptyHint": "目前没有符合条件的反馈。",
     "progressNotice": "展示当前页的真实反馈。票数不直接决定优先级，社区整理状态不等同于官方承诺。",
     "emptyColumn": "当前页暂无反馈"
   },
@@ -1689,5 +1691,13 @@
     "not_found": "此反馈或评论不存在，或当前不可见。",
     "parent": "回复的评论已不可用或已移出当前 IDEA，请重新选择回复对象。",
     "merge_blocked": "该 IDEA 已参与其他合并，请先撤销原合并，不能进行链式合并。"
+  },
+  "publishPage": {
+    "title": "发布",
+    "category": "内容分类",
+    "post": "普通帖子",
+    "feedback": "产品反馈",
+    "product": "社区产品",
+    "idea": "产品想法（旧版）"
   }
 }

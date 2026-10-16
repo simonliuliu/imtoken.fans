@@ -8,7 +8,6 @@ import { useAuth } from "@/lib/auth-context";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationBell } from "@/components/notification-bell";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { ComposeDemoButton } from "@/components/community-elements";
 import { BrandLogo } from "@/components/brand-logo";
 import { AuthLoading } from "@/components/auth-loading";
 import { getSignInHref } from "@/lib/auth-navigation";
@@ -34,7 +33,7 @@ export function SiteHeader() {
         </nav>
         <div className="fans-header-tools">
           <LanguageSwitcher />
-          <ComposeDemoButton compact />
+          <Link href="/submit" aria-label={t("submit")} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>
           <div className="fans-desktop-account">
             {loading ? <AuthLoading compact /> : user ? <><NotificationBell /><UserMenu name={user.name} avatarUrl={user.avatarUrl} isAdmin={isAdmin} onSignOut={signOut} /></> : <Link href={signInHref} className="fans-signin">{t("signIn")}</Link>}
           </div>
