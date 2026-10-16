@@ -82,8 +82,8 @@ export function ProductHunterExplorer({ products }: { products: SubmissionCard[]
             <span className="text-xs text-faint">{t("resultCount", { count: visible.length })}</span>
           </div>
 
-          <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,150px))]">
-            <label className="relative">
+          <div className="mt-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,150px))]">
+            <label className="relative col-span-2 sm:col-span-1">
               <span className="sr-only">{t("searchLabel")}</span>
               <input
                 type="search"
@@ -127,7 +127,7 @@ export function ProductHunterExplorer({ products }: { products: SubmissionCard[]
           <div className="divide-y divide-line px-5 sm:px-6">
             {visible.map((product, index) => (
               <article key={product.id} className="group py-5">
-                <div className="flex items-start gap-3 sm:gap-4">
+                <div className="grid grid-cols-[1.25rem_3rem_minmax(0,1fr)] items-start gap-3 sm:flex sm:gap-4">
                   <span className="mt-2 w-5 shrink-0 text-center font-mono text-xs text-faint">{index + 1}</span>
                   <Avatar
                     src={product.logo_path ? getSubmissionMediaUrl(product.logo_path) : null}
@@ -136,7 +136,7 @@ export function ProductHunterExplorer({ products }: { products: SubmissionCard[]
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/products/${product.id}`} className="font-bold text-ink group-hover:text-brand-ink">{product.title}</Link>
+                      <Link href={`/products/${product.id}`} className="break-words font-bold text-ink group-hover:text-brand-ink">{product.title}</Link>
                       {product.launch_stage && <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-ink">{t(`stages.${product.launch_stage}`)}</span>}
                     </div>
                     <p className="mt-1 text-sm leading-6 text-muted">{product.tagline}</p>
@@ -149,7 +149,7 @@ export function ProductHunterExplorer({ products }: { products: SubmissionCard[]
                     </div>
                     {product.tags.length > 0 && <p className="mt-2 truncate text-xs text-faint">{product.tags.slice(0, 3).map((value) => getTagLabel(value, locale)).join(" · ")}</p>}
                   </div>
-                  <div className="grid shrink-0 grid-cols-2 gap-2">
+                  <div className="col-start-3 grid shrink-0 grid-cols-2 gap-2">
                     <Metric label={t("ratingMetric")} value={product.rating_count ? `${product.rating_average?.toFixed(1)}★` : "—"} detail={t("ratingCount", { count: product.rating_count })} />
                     <Metric label={t("supportMetric")} value={String(product.support_count)} detail={t("commentCount", { count: product.comment_count })} />
                   </div>

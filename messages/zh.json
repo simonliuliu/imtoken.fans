@@ -315,7 +315,7 @@
     "ctaButton": "去提交"
   },
   "productHunter": {
-    "eyebrow": "产品共创 · Product Hunter",
+    "eyebrow": "社区产品",
     "title": "发现值得体验的社区产品",
     "subtitle": "面向钱包用户与加密社区的产品发现区。体验真实产品、给出可信评分，并直接与创作者交流。",
     "principleUsable": "产品可访问或有可验证 Demo",
@@ -366,6 +366,8 @@
     "clearFilters": "清除 {count} 项筛选",
     "emptyTitle": "没有符合条件的产品",
     "emptyBody": "换个搜索词或清除筛选后再试。",
+    "loadFailedTitle": "社区产品暂时无法加载",
+    "loadFailedBody": "请稍后刷新重试，你仍可浏览产品反馈和产品公告。",
     "showAll": "查看全部产品",
     "ratingMetric": "评分",
     "supportMetric": "支持",
@@ -1176,9 +1178,6 @@
     "profile": "我的资料",
     "growthRules": "成长说明",
     "checkinCta": "签到与抽奖",
-    "historyNote": "浏览社区产品猎手；旧点子保留在历史入口。",
-    "historicalProducts": "进入产品猎手",
-    "historicalIdeas": "历史 AI 点子",
     "comment": "评论",
     "vote": "投票",
     "pollNotice": "示例投票，可再次点击取消或选择另一项。",

@@ -21,6 +21,7 @@ function revalidateAdmin(): void {
 
 // 列表页/首页/排行榜上都显示评论数和内容卡片，后台删/恢复内容后需要一并失效。
 function revalidatePublicLists(): void {
+  revalidatePath("/[locale]/community/[section]", "page");
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/ideas");

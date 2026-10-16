@@ -315,7 +315,7 @@
     "ctaButton": "Submit now"
   },
   "productHunter": {
-    "eyebrow": "Co-create · Product Hunter",
+    "eyebrow": "Community builds",
     "title": "Discover community products worth trying",
     "subtitle": "A discovery space for products serving wallet users and the crypto community. Try real products, leave credible ratings, and talk directly with their makers.",
     "principleUsable": "Usable product or verifiable demo",
@@ -344,6 +344,8 @@
     "clearFilters": "Clear {count} filters",
     "emptyTitle": "No products match these filters",
     "emptyBody": "Try another search or clear the filters.",
+    "loadFailedTitle": "Community builds could not be loaded",
+    "loadFailedBody": "Please refresh and try again later. You can still browse product feedback and updates.",
     "showAll": "Show all products",
     "ratingMetric": "Rating",
     "supportMetric": "Support",
@@ -1121,9 +1123,6 @@
     "profile": "My profile",
     "growthRules": "Growth guide",
     "checkinCta": "Check-in & lucky draws",
-    "historyNote": "Explore Community Product Hunter; legacy ideas remain in their archive.",
-    "historicalProducts": "Open Product Hunter",
-    "historicalIdeas": "AI idea archive",
     "comment": "Comment",
     "vote": "Vote",
     "pollNotice": "Sample poll. Click again to clear your choice, or choose another option.",

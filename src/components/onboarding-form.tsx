@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter } from "next/navigation";
 import { completeOnboarding, skipOnboarding } from "@/app/actions/profile";
 import { useAuth } from "@/lib/auth-context";
 import { ProfileFields, type ProfileFieldsValue } from "@/components/profile-fields";

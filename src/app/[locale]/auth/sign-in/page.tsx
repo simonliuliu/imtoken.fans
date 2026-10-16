@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import {
   signInWithGoogle,
   signInWithPassword,
@@ -12,10 +12,11 @@ import {
   signUpWithUsername,
 } from "@/app/[locale]/auth/actions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { sanitizeRedirect } from "@/lib/redirect";
+import { getAuthReturnPath } from "@/lib/auth-navigation";
 import { connectWalletAndSignIn, connectWalletConnectAndSignIn, hasWalletConnectProjectId } from "@/lib/wallet-client";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/brand-logo";
+import { AuthLoading } from "@/components/auth-loading";
 
 export default function SignInPage() {
   return (
@@ -26,17 +27,16 @@ export default function SignInPage() {
 }
 
 function SignInFallback() {
-  const tc = useTranslations("common");
-  return <div className="mx-auto max-w-sm px-4 py-24 text-center text-sm text-faint">{tc("loading")}</div>;
+  return <AuthLoading />;
 }
 
 function SignInForm() {
   const t = useTranslations("signIn");
-  const tc = useTranslations("common");
+  const locale = useLocale();
   const tw = useTranslations("wallet");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
+  const redirectTo = getAuthReturnPath(searchParams.get("redirect"), locale);
   const configured = isSupabaseConfigured();
   const walletConnectAvailable = hasWalletConnectProjectId();
   const { user, loading } = useAuth();
@@ -86,8 +86,7 @@ function SignInForm() {
       // 登录成功后沿用本页既有的整页跳转（而不是 router.push）：硬重载能确保服务端组件
       // 一定拿到刚写入的 session cookie。钱包登录在客户端分不清新老用户，统一进 /welcome，
       // 引导页自己判断——已经走过引导的会被直接放行到 redirectTo。
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = `/welcome?redirect=${encodeURIComponent(redirectTo)}`;
+      window.location.href = getAuthReturnPath(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale);
     } catch (err) {
       setError(err instanceof Error ? err.message : tw("verifyFailed"));
       setBusy(null);
@@ -109,8 +108,7 @@ function SignInForm() {
         metadataDescription: tw("metadataDescription"),
       });
       // 同上：整页跳转 + 统一进 /welcome 由服务端判断是否需要引导。
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = `/welcome?redirect=${encodeURIComponent(redirectTo)}`;
+      window.location.href = getAuthReturnPath(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale);
     } catch (err) {
       setError(err instanceof Error ? err.message : tw("verifyFailed"));
       setBusy(null);
@@ -149,7 +147,7 @@ function SignInForm() {
     const result =
       credential === "email"
         ? mode === "signup"
-          ? await signUpWithPassword({ email, password, nickname: nickname.trim() })
+          ? await signUpWithPassword({ email, password, nickname: nickname.trim(), redirectTo })
           : await signInWithPassword({ email, password })
         : mode === "signup"
           ? await signUpWithUsername({ username, password })
@@ -168,11 +166,11 @@ function SignInForm() {
     // 注册（而不是登录）成功的一定是新用户，直接送去引导页完善昵称/头像；
     // 登录走原来的跳转。OAuth 那条路的判断在 /auth/callback 里做。
     window.location.href =
-      mode === "signup" ? `/welcome?redirect=${encodeURIComponent(redirectTo)}` : redirectTo;
+      mode === "signup" ? getAuthReturnPath(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale) : redirectTo;
   }
 
   if (loading || user) {
-    return <div className="mx-auto max-w-sm px-4 py-24 text-center text-sm text-faint">{tc("loading")}</div>;
+    return <AuthLoading />;
   }
 
   return (

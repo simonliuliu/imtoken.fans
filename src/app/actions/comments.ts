@@ -27,6 +27,7 @@ import type { CommentReportReason, CommentWithAuthor } from "@/lib/types";
 // 列表页/首页/排行榜上都显示评论数，这些页面走缓存，发评论后需要一并失效，
 // 否则详情页里评论数变了、列表页还是旧数字。
 function revalidateCommentCounts(): void {
+  revalidatePath("/[locale]/community/[section]", "page");
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/ideas");

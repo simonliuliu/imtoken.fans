@@ -125,6 +125,7 @@ export async function upsertProductRating(
 }
 
 function revalidateProductPaths() {
+  revalidatePath("/[locale]/community/[section]", "page");
   revalidatePath("/[locale]/products", "page");
   revalidatePath("/[locale]/products/[id]", "page");
 }

@@ -52,15 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setUser(null);
           setIsAdmin(false);
+          setLoading(false);
         }
         return;
       }
+      if (!cancelled) setLoading(true);
       // profiles 是公开可读的（RLS: select using (true)），客户端直接查就行。
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, username, display_name, avatar_url, bio")
-        .eq("id", rawUser.id)
-        .maybeSingle();
+      const { data: profile } = await Promise.resolve(
+        supabase
+          .from("profiles")
+          .select("role, username, display_name, avatar_url, bio")
+          .eq("id", rawUser.id)
+          .maybeSingle()
+      ).catch(() => ({ data: null }));
+      // 较早的账号请求不能覆盖退出/切换账号后已开始的会话。
       if (cancelled || version !== sessionVersionRef.current) return;
       setIsAdmin(profile?.role === "admin");
       setUser({
@@ -70,15 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatarUrl: profile?.avatar_url ?? null,
         bio: profile?.bio ?? null,
       });
+      setLoading(false);
     }
 
     async function loadInitialSession() {
+      const initialVersion = sessionVersionRef.current;
       for (let attempt = 0; attempt <= INITIAL_LOAD_RETRY_DELAYS_MS.length; attempt++) {
         try {
           const version = sessionVersionRef.current;
           const { data, error } = await supabase.auth.getUser();
           if (version !== sessionVersionRef.current) return;
           if (error) throw error;
+          if (cancelled || initialVersion !== sessionVersionRef.current) return;
           await syncSession(data.user);
           return;
         } catch {
@@ -90,14 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     loadInitialSession().finally(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled && sessionVersionRef.current === 0) setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       syncSession(session?.user ?? null)
-        .catch(() => {})
-        .finally(() => {
-          if (!cancelled) setLoading(false);
+        .catch(() => {
+          // 仅当前账号的失败可以结束加载；晚到的旧请求不能清掉新会话。
+          if (!cancelled && rawUserRef.current?.id === session?.user?.id) {
+            setUser(null);
+            setIsAdmin(false);
+            setLoading(false);
+          }
         });
     });
 
