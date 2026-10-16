@@ -2,7 +2,7 @@
 
 面向 imToken 钱包用户的社区平台，由原 imAihunt 改造。四个一级板块：**钱包安全、产品共创、综合交流、活动区**。产品共创下设产品反馈、社区产品、产品公告；社区产品不限于 AI。钱包安全以官方/用户故事与案例为核心，交流首版支持币圈行情等论坛讨论。
 
-当前阶段（2026-10-15）：继续 M1-B 全站品牌与参与说明，任务与检查见 [M1-B](docs/tasks/M1-B-brand-consistency.md)。四板块演示已按 PRD 命名，真实四板块写入仍待 M2/M3；演示不产生经验或奖励。
+当前阶段（2026-10-16）：整合全站品牌、简化板块、登录体验、社区产品与真实产品反馈。正式环境已接入原 Supabase；其他演示内容仍有明确边界。进度与验证见 [本批集成](docs/tasks/all-pr-integration.md)，视觉效果待用户 review。
 
 本地预览：[http://localhost:3000/zh](http://localhost:3000/zh)。VS Code 打开本目录，在终端运行 `npm run dev`，或按 F5 选择「imToken Fans: 启动并预览 (3000)」。首次安装、停止服务和端口占用处理见 [本地启动说明](docs/local-development.md)。已有服务运行时直接查看，不要重复启动。
 
@@ -197,7 +197,7 @@ roadmap.md                当前任务优先级与里程碑
 
 ## 部署到 Vercel
 
-本项目已在 `simonliulius-projects` 下创建 `imtoken-fans` 并连接本仓库。任务分支推送后查看 PR 的 Vercel 预览状态；合入 `main` 后更新主站。当前是未配置数据库等密钥的社区演示，真实登录与写入不在此次部署范围内。配置、验证结果与限制见 [自动预览任务记录](docs/tasks/vercel-auto-preview.md)。
+本项目已在 `simonliulius-projects` 下创建 `imtoken-fans` 并连接本仓库。任务分支推送后查看 PR 的 Vercel 预览状态；合入 `main` 后更新主站。正式环境已配置登录与数据库；分支预览不复制正式数据库凭证。最新反馈迁移及本批部署状态见 [本批集成](docs/tasks/all-pr-integration.md)。配置、验证结果与限制见 [自动预览任务记录](docs/tasks/vercel-auto-preview.md)。
 
 以下为后续启用真实业务时的通用配置步骤；不要把本地密钥直接写进公开仓库，也不要未经确认将生产高权限密钥用于外部 PR 预览。
 

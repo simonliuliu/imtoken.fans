@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      if (!cancelled) setLoading(true);
+      // Same-account token refresh must preserve mounted drafts and editors.
       // profiles 是公开可读的（RLS: select using (true)），客户端直接查就行。
       const { data: profile } = await Promise.resolve(
         supabase

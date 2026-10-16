@@ -10,7 +10,6 @@ export default async function OpenGraphImage() {
   return new ImageResponse(
     <div style={{ display: "flex", width: "100%", height: "100%", background: "#f5f7fb", padding: 48 }}>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", height: "100%", background: "white", borderRadius: 32, border: "1px solid #e1e7ef", padding: 72 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders the supplied logo directly. */}
         <img src={logo} alt="" width={714} height={168} />
         <div style={{ display: "flex", marginTop: 56, gap: 16 }}>
           {["#f43b6b", "#19334a", "#c7d9ea", "#fbd9e3"].map((color) => (
