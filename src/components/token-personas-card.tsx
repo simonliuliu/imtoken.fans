@@ -8,7 +8,7 @@ import { Link } from "@/i18n/navigation";
 const PERSONAS = ["btc", "eth", "near", "zec", "niulai"] as const;
 type Persona = (typeof PERSONAS)[number];
 
-export function TokenPersonasCard() {
+export function TokenPersonasCard({ external = false }: { external?: boolean }) {
   const t = useTranslations("tokenPersonas");
   const titleId = useId();
   const descriptionId = useId();
@@ -27,13 +27,16 @@ export function TokenPersonasCard() {
       <h2>{t("title")}</h2>
       <div className="token-personas-grid">
         {PERSONAS.map((persona) => (
-          <button type="button" key={persona} aria-haspopup="dialog" aria-label={t("openPersona", { name: t(`characters.${persona}.name`) })} onClick={(event) => { trigger.current = event.currentTarget; setSelected(persona); }}>
+          external ? <a key={persona} href="https://bman.buidl4.top/c/general" aria-label={t("visitPersona", { name: t(`characters.${persona}.name`) })}>
+            <Image src={`/images/token-personas/${persona}.png`} width={72} height={72} sizes="64px" alt="" />
+            <span>{t(`characters.${persona}.name`)}</span>
+          </a> : <button type="button" key={persona} aria-haspopup="dialog" aria-label={t("openPersona", { name: t(`characters.${persona}.name`) })} onClick={(event) => { trigger.current = event.currentTarget; setSelected(persona); }}>
             <Image src={`/images/token-personas/${persona}.png`} width={72} height={72} sizes="64px" alt="" />
             <span>{t(`characters.${persona}.name`)}</span>
           </button>
         ))}
       </div>
-      <p className="token-personas-footnote">{t("previewLabel")}</p>
+      <p className="token-personas-footnote">{t(external ? "externalNotice" : "previewLabel")}</p>
       <dialog ref={dialog} className="token-persona-dialog" aria-labelledby={titleId} aria-describedby={descriptionId} onClose={() => { setSelected(null); trigger.current?.focus(); }} onClick={(event) => { if (event.target === dialog.current) close(); }}>
         {selected && <div className="token-persona-dialog-content">
           <button type="button" className="community-icon-button token-persona-close" aria-label={t("close")} onClick={close} autoFocus>×</button>

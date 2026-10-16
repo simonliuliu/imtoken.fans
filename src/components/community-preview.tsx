@@ -99,7 +99,7 @@ function DemoFeed({ section, productsContent, initialCategory = "all", initialId
         {filtered.length > visible && <button type="button" className="community-load-more" onClick={() => setVisible((count) => count + 8)}>{t("loadMore")}<span aria-hidden>↓</span></button>}
       </>}
     </section>
-    {hasSidebar && !showProducts && <aside className="community-sidebar community-simple-sidebar community-personas-sidebar"><TokenPersonasCard /></aside>}
+    {hasSidebar && !showProducts && <aside className="community-sidebar community-simple-sidebar community-personas-sidebar"><TokenPersonasCard external={!section} /></aside>}
   </div>;
 }
 

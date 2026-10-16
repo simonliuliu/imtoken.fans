@@ -1443,6 +1443,8 @@
     "localInteraction": "Updated for this page only"
   },
   "tokenPersonas": {
+    "visitPersona": "Visit the digital coin community: {name}",
+    "externalNotice": "Select any character to visit the digital coin community.",
     "title": "Token Personas",
     "previewLabel": "Circle preview · In preparation",
     "openPersona": "Preview the {name} circle",
