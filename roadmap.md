@@ -248,3 +248,5 @@ Google公开报告已确认 imtoken-fans.vercel.app 为 unsafe，类别是诱导
 ### 全部PR合并追加
 
 PR25经集成PR29已合入；PR27追加的发布流程与PR30安全验证准备继续整合。反馈不可变请求保护保留，Google告警解除仍待Search Console核实/复审；0031数据库校验尚待安全操作窗口。详见[本次记录](docs/tasks/pr25-27-integration.md)。
+
+追加整合检查完成：发布流程、草稿保护、Google精确验证路径和钱包挑战独立复核通过，1576键/类型/lint/build通过。交付进入所有者已授权的合并发布；精确main/生产部署结果见集成PR31。0031真实激活和Google复审仍保持待办。
