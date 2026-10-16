@@ -115,6 +115,8 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 
 [任务卡](docs/tasks/M1-token-personas-entry.md) · [review](docs/reviews/M1-token-personas-entry.md)。
 
+2026-10-16 局部更新：首页五个数字币人改为直接访问用户指定的 B-Man 综合地址；综合交流保留角色预览。双语、lint、build、桌面/手机实际导航检查通过，待 PR / 用户 review，未部署。见 [外链任务](docs/tasks/M1-token-personas-external-link.md) 与 [检查记录](docs/reviews/M1-token-personas-external-link.md)。
+
 ## M6 · 运营增强 · P2
 
 - [ ] 关注/收藏、定向更新通知。

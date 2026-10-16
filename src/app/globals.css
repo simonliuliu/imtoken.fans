@@ -1317,10 +1317,10 @@ html {
 /* Token persona circle entrances: visual placeholders, without chat or account state. */
 .token-personas-card > h2 { font-size: 16px; font-weight: 650; }
 .token-personas-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; row-gap: 16px; margin-top: 20px; }
-.token-personas-grid > button { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 4px 0; cursor: pointer; border-radius: 10px; }
-.token-personas-grid > button:hover { color: var(--brand-ink); background: #faf7f8; }
+.token-personas-grid > :is(button, a) { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 4px 0; cursor: pointer; border-radius: 10px; }
+.token-personas-grid > :is(button, a):hover { color: var(--brand-ink); background: #faf7f8; }
 .token-personas-grid img { width: 64px; height: 64px; object-fit: cover; border-radius: 18px; background: #f3f4f6; border: 1px solid #edf0f4; }
-.token-personas-grid > button > span { max-width: 100%; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.token-personas-grid > :is(button, a) > span { max-width: 100%; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .token-personas-footnote { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; font-size: 11px; line-height: 1.6; color: #6b7486; }
 .token-persona-dialog { width: min(420px, calc(100% - 32px)); max-height: calc(100dvh - 40px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 16px; background: white; color: var(--ink); }
 .token-persona-dialog::backdrop { background: #14213d66; }
@@ -1339,7 +1339,7 @@ html {
   .community-personas-sidebar > .community-safety-note { display: none; }
   .token-personas-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 6px; margin-top: 16px; }
   .token-personas-grid img { width: min(100%, 54px); height: auto; aspect-ratio: 1; border-radius: 15px; }
-  .token-personas-grid > button > span { font-size: 11px; }
+  .token-personas-grid > :is(button, a) > span { font-size: 11px; }
   .token-personas-footnote { margin-top: 14px; }
 }
 
@@ -1366,3 +1366,5 @@ html {
   .community-carousel-link h1 { font-size: 21px; }
   .community-carousel-controls { justify-content: center; }
 }
+
+.token-personas-grid > a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }

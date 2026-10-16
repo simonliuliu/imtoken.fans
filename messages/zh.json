@@ -1432,6 +1432,8 @@
     "localInteraction": "已更新，仅当前页面有效"
   },
   "tokenPersonas": {
+    "visitPersona": "前往数字币人社区：{name}",
+    "externalNotice": "点击任意数字币人，进入数字币人社区。",
     "title": "数字币人",
     "previewLabel": "圈子预览 · 功能筹备中",
     "openPersona": "查看 {name} 圈子预览",
