@@ -869,7 +869,17 @@
     "badgeFallback": "新徽章",
     "xpAdded": "管理员为你增加了 {amount} 经验值",
     "xpRemoved": "管理员扣除了 {amount} 经验值",
-    "xpBalance": "，当前 {xp} XP"
+    "xpBalance": "，当前 {xp} XP",
+    "follow_post": "发布了新内容",
+    "follow_comment": "发表了评论或回复",
+    "loadError": "消息服务暂不可用，请检查数据库迁移与配置后重试。",
+    "sessionError": "账号已变化，请刷新后重试。",
+    "retry": "重试",
+    "previous": "上一页",
+    "next": "下一页",
+    "range": "{start}–{end} / {total}",
+    "viewAll": "查看全部消息",
+    "signInRequired": "请登录后查看消息。"
   },
   "checkin": {
     "title": "每日签到",
@@ -1689,5 +1699,17 @@
     "not_found": "此反馈或评论不存在，或当前不可见。",
     "parent": "回复的评论已不可用或已移出当前 IDEA，请重新选择回复对象。",
     "merge_blocked": "该 IDEA 已参与其他合并，请先撤销原合并，不能进行链式合并。"
+  },
+  "following": {
+    "follow": "关注",
+    "unfollow": "取消关注",
+    "signIn": "登录后关注",
+    "counts": "{followers} 位关注者 · 关注了 {following} 人",
+    "subscriptions": "动态通知",
+    "posts": "发帖",
+    "comments": "评论与回复",
+    "error": "关注服务暂不可用，请检查数据库迁移与配置后重试。",
+    "list": "查看关注的人（最近 100 位）",
+    "empty": "还没有关注任何人。"
   }
 }

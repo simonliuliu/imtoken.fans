@@ -10,7 +10,6 @@ import { getCurrentProfile } from "@/lib/profile";
 import { isBlacklisted } from "@/lib/user-tags";
 import { hasPermission, requirePermission } from "@/lib/admin-guard";
 import { softDeleteContent } from "@/lib/admin-moderation";
-import { extractMentionedUsernames } from "@/lib/mentions";
 import { awardXpByRule, deterministicUuid } from "@/lib/xp";
 import type { CommentReportReason, CommentWithAuthor } from "@/lib/types";
 
@@ -77,17 +76,7 @@ export async function postComment(
     authorId: profile.id,
   });
 
-  // 通知要查父评论作者、查被 @的人、再插入，好几次往返，但收件人不是当前用户，
-  // 晚几百毫秒到达完全没关系——挪到响应之后，不占用发评论的等待时间。
-  after(() =>
-    createCommentNotifications({
-      commentId: inserted.id,
-      submissionId,
-      parentId: parentId ?? null,
-      body: trimmed,
-      actorId: profile.id,
-    })
-  );
+  // Published notifications are emitted transactionally by database triggers.
 
   // 经验值也放到响应之后：加分要走 RPC + 可能写一条升级通知，
   // 但用户只关心评论有没有发出去，不该为这几百毫秒等着。
@@ -127,64 +116,6 @@ export async function postComment(
     viewer_has_voted: false,
   };
   return { comment };
-}
-
-// 评论发布成功后触发通知：谁的评论被回复了、谁被 @了。
-// 一律走 admin client——收件人不是当前登录用户，普通客户端的 RLS（写自己）覆盖不了这个场景，
-// notifications 表本身也没有开放给 authenticated 的 insert 策略。
-async function createCommentNotifications(params: {
-  commentId: string;
-  submissionId: string;
-  parentId: string | null;
-  body: string;
-  actorId: string;
-}): Promise<void> {
-  const admin = createAdminClient();
-  const notifiedUserIds = new Set<string>();
-
-  if (params.parentId) {
-    const { data: parentComment } = await admin
-      .from("comments")
-      .select("user_id")
-      .eq("id", params.parentId)
-      .maybeSingle();
-
-    if (parentComment && parentComment.user_id !== params.actorId) {
-      await admin.from("notifications").insert({
-        user_id: parentComment.user_id,
-        actor_id: params.actorId,
-        type: "reply",
-        submission_id: params.submissionId,
-        comment_id: params.commentId,
-      });
-      notifiedUserIds.add(parentComment.user_id);
-    }
-  }
-
-  const mentionedUsernames = extractMentionedUsernames(params.body);
-  if (mentionedUsernames.length === 0) return;
-
-  // 大小写不敏感匹配：username/password 注册的账号是强制小写，但 Google 登录直接拿
-  // full_name 当 username，大小写不受控，用 .in() 精确匹配会漏掉这类账号。
-  // "_" 是 ilike 的通配符（匹配任意单字符），用户名允许包含 "_"，这里要转义掉。
-  const orFilter = mentionedUsernames
-    .map((username) => `username.ilike.${username.replace(/_/g, "\\_")}`)
-    .join(",");
-  const { data: mentionedProfiles } = await admin.from("profiles").select("id, username").or(orFilter);
-
-  const mentionRows = (mentionedProfiles ?? [])
-    .filter((p) => p.id !== params.actorId && !notifiedUserIds.has(p.id))
-    .map((p) => ({
-      user_id: p.id,
-      actor_id: params.actorId,
-      type: "mention" as const,
-      submission_id: params.submissionId,
-      comment_id: params.commentId,
-    }));
-
-  if (mentionRows.length > 0) {
-    await admin.from("notifications").insert(mentionRows);
-  }
 }
 
 // Product Hunt 风格：单一点赞（不是产品页那种 paid/creative 双票种）。

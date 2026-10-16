@@ -869,7 +869,17 @@
     "badgeFallback": "New badge",
     "xpAdded": "An admin gave you {amount} XP",
     "xpRemoved": "An admin removed {amount} XP",
-    "xpBalance": " — {xp} XP now"
+    "xpBalance": " — {xp} XP now",
+    "follow_post": "published a new post",
+    "follow_comment": "posted a comment or reply",
+    "loadError": "Notifications are unavailable. Check database migrations and configuration, then retry.",
+    "sessionError": "Your account changed. Refresh and retry.",
+    "retry": "Retry",
+    "previous": "Previous",
+    "next": "Next",
+    "range": "{start}–{end} / {total}",
+    "viewAll": "View all notifications",
+    "signInRequired": "Sign in to view notifications."
   },
   "checkin": {
     "title": "Daily check-in",
@@ -1689,5 +1699,17 @@
     "not_found": "This IDEA or comment does not exist or is not currently visible.",
     "parent": "The comment is unavailable or no longer belongs to this IDEA. Choose a reply target again.",
     "merge_blocked": "This IDEA already participates in a merge. Undo that merge first; chained merges are not supported."
+  },
+  "following": {
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "signIn": "Sign in to follow",
+    "counts": "{followers} followers · Following {following}",
+    "subscriptions": "Activity notifications",
+    "posts": "Posts",
+    "comments": "Comments and replies",
+    "error": "Following is unavailable. Check database migrations and configuration, then retry.",
+    "list": "View following (latest 100)",
+    "empty": "Not following anyone yet."
   }
 }
