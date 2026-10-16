@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -70,9 +70,9 @@ const DESCRIPTION_MIN = 10;
 const DRAFT_STORAGE_KEY = "imtoken-fans-submission-drafts-v2";
 
 export function ProductSubmissionForm() {
-  const { user } = useAuth();
+  const { user, sessionEpoch } = useAuth();
   // Switching accounts must recreate all in-memory form state.
-  return <SubmitPageContent key={user?.id ?? "anonymous"} />;
+  return <SubmitPageContent key={`${user?.id ?? "anonymous"}:${sessionEpoch}`} />;
 }
 
 function SubmitPageContent() {
@@ -83,16 +83,17 @@ function SubmitPageContent() {
   const locale = useLocale();
   const router = useRouter();
   const [drafts, setDrafts] = useState({ product: emptyDraft() });
-  const signInHref = getSignInHref("/submit?type=product", locale);
+  const signInHref = getSignInHref("/submit/product", locale);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [published, setPublished] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) router.replace(signInHref);
-  }, [loading, user, router, signInHref]);
+  const [storageError, setStorageError] = useState(false);
+  const [signInRequired, setSignInRequired] = useState(false);
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -100,13 +101,25 @@ function SubmitPageContent() {
         const saved = draftStorageKey ? window.localStorage.getItem(draftStorageKey) : null;
         if (saved) {
           const stored = JSON.parse(saved);
-          if (stored && typeof stored === "object" && stored.product && typeof stored.product === "object") {
+          if (stored && typeof stored === "object" && !Array.isArray(stored)) {
             // Keep legacy drafts in storage, but only restore/edit the product draft.
-            setDrafts({ ...stored, product: { ...emptyDraft(), ...stored.product } });
+            const product = stored.product && typeof stored.product === "object" ? stored.product : {};
+            const restored = emptyDraft();
+            for (const key of Object.keys(restored) as (keyof Draft)[]) {
+              const value = product[key];
+              if (Array.isArray(restored[key])) {
+                if (Array.isArray(value)) {
+                  if (key === "team") restored.team = value.filter((item: TeamMember) => item && typeof item.name === "string" && typeof item.role === "string" && (item.link === undefined || typeof item.link === "string"));
+                  else if (key === "socialLinks") restored.socialLinks = value.filter((item: SocialLink) => item && typeof item.label === "string" && typeof item.url === "string");
+                  else Object.assign(restored, { [key]: value.filter((item: unknown) => typeof item === "string") });
+                }
+              } else if (typeof value === "string" || key === "logoPath" && value === null) Object.assign(restored, { [key]: value });
+            }
+            setDrafts({ ...stored, product: restored });
           }
         }
       } catch {
-        if (draftStorageKey) window.localStorage.removeItem(draftStorageKey);
+        setStorageError(true);
       } finally {
         setDraftReady(true);
       }
@@ -116,16 +129,25 @@ function SubmitPageContent() {
 
   useEffect(() => {
     if (!draftReady || !draftStorageKey) return;
-    window.localStorage.setItem(draftStorageKey, JSON.stringify(drafts));
+    try { window.localStorage.setItem(draftStorageKey, JSON.stringify(drafts)); queueMicrotask(() => { if (mounted.current) setStorageError(false); }); }
+    catch { queueMicrotask(() => { if (mounted.current) setStorageError(true); }); }
   }, [draftReady, drafts, draftStorageKey]);
 
   const draft = drafts.product;
+
+  function continueSignIn() {
+    try {
+      if (draftStorageKey) window.localStorage.setItem(draftStorageKey, JSON.stringify(drafts));
+      router.push(signInHref);
+    } catch { setStorageError(true); setError(t("draftUnavailable")); }
+  }
 
   function updateDraft(patch: Partial<Draft>) {
     setDrafts((prev) => ({ ...prev, product: { ...prev.product, ...patch } }));
   }
 
-  if (loading || !user) return <AuthLoading />;
+  if (loading) return <AuthLoading />;
+  if (!user) return <div className="mx-auto max-w-3xl px-4 py-14"><h1 className="text-3xl font-extrabold text-ink">{t("title")}</h1><p className="my-5 text-muted">{t("signInRequired")}</p><Link className="community-button" href={signInHref}>{t("signInPublish")}</Link></div>;
 
   if (submitted) {
     return (
@@ -168,14 +190,19 @@ function SubmitPageContent() {
     draft.screenshotPaths.length > 0 &&
     draft.tags.length > 0 &&
     draft.productPlatforms.length > 0;
-  const canSubmit = titleOk && taglineOk && descriptionOk && productReady && !busy;
+  const canSubmit = titleOk && taglineOk && descriptionOk && productReady;
+  const missingFields = [!titleOk && t("fieldTitle"), !taglineOk && t("fieldTagline"), !descriptionOk && t("fieldDescription"), !draft.websiteUrl.trim() && t("fieldWebsite"), !draft.logoPath && t("logoLabel"), !draft.screenshotPaths.length && t("screenshotsLabel", {max: MAX_SCREENSHOTS}), !draft.tags.length && t("fieldTags"), !draft.productPlatforms.length && t("fieldPlatforms")].filter(Boolean).join(" · ");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (inFlight.current || busy || !draftReady) return;
+    if (!canSubmit) { setError(t("missingRequired", { fields: missingFields })); return; }
+    inFlight.current = true;
     setError(null);
     setBusy(true);
+    try {
     const result = await createSubmission({
+      expectedUser: user!.id,
       type: "product",
       title: draft.title,
       tagline: draft.tagline,
@@ -194,13 +221,17 @@ function SubmitPageContent() {
       makerNote: draft.makerNote,
       feedbackPrompt: draft.feedbackPrompt,
     });
-    setBusy(false);
+    if (!mounted.current) return;
     if ("error" in result) {
+      setSignInRequired(result.code === "sign_in");
       setError(result.error);
       return;
     }
     setPublished(result.published);
     setSubmitted(true);
+    setDrafts((prev) => ({ ...prev, product: emptyDraft() }));
+    } catch { if (mounted.current) setError(t("unexpectedError")); }
+    finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
 
   return (
@@ -209,7 +240,8 @@ function SubmitPageContent() {
         <h1 className="text-3xl font-extrabold text-ink">{t("title")}</h1>
         <p className="mt-2 text-muted">{t("subtitle", { name: user.name })}</p>
 
-        <form className="mt-8 flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6" onSubmit={handleSubmit}>
+        <form className="mt-8 flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6" onSubmit={handleSubmit} aria-busy={busy}>
+          <fieldset className="contents" disabled={busy}>
           <Field
             label={t("fieldTitle")}
             placeholder={t("fieldTitlePlaceholder")}
@@ -322,17 +354,20 @@ function SubmitPageContent() {
             </ol>
           </div>
 
-          <p className="font-mono text-[11px] text-faint">{draftReady ? t("draftSaved") : t("draftLoading")}</p>
+          <p className="font-mono text-[11px] text-faint">{storageError ? t("draftUnavailable") : draftReady ? t("draftSaved") : t("draftLoading")}</p>
 
-          {error && <p className="rounded-lg bg-risk-soft px-3 py-2 text-xs text-risk">{error}</p>}
+          {missingFields && <p className="text-sm text-muted">{t("missingRequired", { fields: missingFields })}</p>}
+          {signInRequired && <button type="button" className="community-button" onClick={continueSignIn}>{t("signInPublish")}</button>}
+          {error && <p role="alert" className="rounded-lg bg-risk-soft px-3 py-2 text-xs text-risk">{error}</p>}
 
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={busy || !draftReady}
             className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? tc("submitting") : t("submitButton")}
           </button>
+          </fieldset>
         </form>
       </div>
     </div>
@@ -449,21 +484,23 @@ function LogoField({ logoPath, onChange }: { logoPath: string | null; onChange: 
     startTransition(async () => {
       const formData = new FormData();
       formData.set("file", file);
+      try {
       const result = await uploadSubmissionMedia(formData);
       if ("error" in result) {
         setError(result.error);
         return;
       }
       onChange(result.path);
+      } catch { setError(t("operationError")); }
     });
   }
 
   function handleRemove() {
     if (!logoPath) return;
     const path = logoPath;
-    onChange(null);
     startTransition(async () => {
-      await deleteSubmissionMedia(path);
+      try { const result = await deleteSubmissionMedia(path); if (result.error) { setError(result.error); return; } onChange(null); }
+      catch { setError(t("operationError")); }
     });
   }
 
@@ -515,19 +552,21 @@ function ScreenshotsField({ paths, onChange }: { paths: string[]; onChange: (pat
     startTransition(async () => {
       const formData = new FormData();
       formData.set("file", file);
+      try {
       const result = await uploadSubmissionMedia(formData);
       if ("error" in result) {
         setError(result.error);
         return;
       }
       onChange([...paths, result.path]);
+      } catch { setError(t("operationError")); }
     });
   }
 
   function handleRemove(path: string) {
-    onChange(paths.filter((p) => p !== path));
     startTransition(async () => {
-      await deleteSubmissionMedia(path);
+      try { const result = await deleteSubmissionMedia(path); if (result.error) { setError(result.error); return; } onChange(paths.filter((p) => p !== path)); }
+      catch { setError(t("operationError")); }
     });
   }
 
