@@ -18,9 +18,9 @@ async function getOrigin(): Promise<string> {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:4000";
   // 本地 `next dev` 没有反向代理，不会带 x-forwarded-proto，这里如果照旧默认成 https
-  // 会拼出 https://localhost:3000，浏览器根本连不上，Google 登录回跳后会卡住没反应。
+  // 会拼出 https://localhost:4000，浏览器根本连不上，Google 登录回跳后会卡住没反应。
   const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
   const protocol = h.get("x-forwarded-proto") ?? (isLocalHost ? "http" : "https");
   return `${protocol}://${host}`;

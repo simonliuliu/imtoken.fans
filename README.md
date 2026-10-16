@@ -4,7 +4,7 @@
 
 当前阶段（2026-10-16）：整合全站品牌、简化板块、登录体验、社区产品与真实产品反馈。正式环境已接入原 Supabase；其他演示内容仍有明确边界。进度与验证见 [本批集成](docs/tasks/all-pr-integration.md)，视觉效果待用户 review。
 
-本地预览：[http://localhost:3000/zh](http://localhost:3000/zh)。VS Code 打开本目录，在终端运行 `npm run dev`，或按 F5 选择「imToken Fans: 启动并预览 (3000)」。首次安装、停止服务和端口占用处理见 [本地启动说明](docs/local-development.md)。已有服务运行时直接查看，不要重复启动。
+本地预览：[http://localhost:4000/zh](http://localhost:4000/zh)。VS Code 打开本目录，在终端运行 `npm run dev`，或按 F5 选择「imToken Fans: 启动并预览 (4000)」。首次安装、停止服务和端口占用处理见 [本地启动说明](docs/local-development.md)。已有服务运行时直接查看，不要重复启动。
 
 ## 项目管理入口
 
@@ -125,7 +125,9 @@ npm ci
 npm run dev
 ```
 
-然后打开 http://localhost:3000。
+然后打开 http://localhost:4000。
+
+本地已接入 Supabase 时，可运行 `npm run setup:dev-auth`，再打开 [一键开发登录](http://localhost:4000/zh/dev/login)，选择普通用户 A、B 或管理员。该入口只在显式开启的本机开发模式下可用；详细开关与测试说明见 [本地开发指南](docs/local-development.md)。
 
 ## 配置 Supabase（接入真实数据库时需要）
 

@@ -788,6 +788,20 @@
     "button": "Edit profile",
     "title": "Edit profile"
   },
+  "devAuth": {
+    "eyebrow": "Local development only",
+    "title": "Switch test accounts",
+    "description": "Use real accounts and sessions to test posts, comments and permissions. Switch between members to verify visibility, or open the admin console as the administrator.",
+    "current": "Current account: {name}",
+    "userA": "Member A",
+    "userB": "Member B",
+    "admin": "Development administrator",
+    "other": "Another account",
+    "signedOut": "Signed out",
+    "busy": "Signing in…",
+    "setup": "Run npm run setup:dev-auth in the project terminal to prepare the local test accounts.",
+    "failed": "Development sign-in failed. Check that local Supabase is running and rerun account setup."
+  },
   "signIn": {
     "titleSignIn": "Sign in to imToken Fans",
     "titleSignUp": "Create an imToken Fans account",

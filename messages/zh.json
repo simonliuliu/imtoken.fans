@@ -788,6 +788,20 @@
     "button": "编辑资料",
     "title": "编辑资料"
   },
+  "devAuth": {
+    "eyebrow": "仅限本地开发",
+    "title": "一键切换测试账号",
+    "description": "使用真实账号和会话测试发帖、评论与权限。普通用户用于验证跨账号可见性，管理员可进入管理后台。",
+    "current": "当前身份：{name}",
+    "userA": "普通用户 A",
+    "userB": "普通用户 B",
+    "admin": "开发管理员",
+    "other": "其他账号",
+    "signedOut": "未登录",
+    "busy": "正在登录…",
+    "setup": "请先在项目终端运行 npm run setup:dev-auth，准备本地测试账号。",
+    "failed": "开发登录未成功，请确认本地 Supabase 已运行，并重新执行账号准备命令。"
+  },
   "signIn": {
     "titleSignIn": "登录 imToken Fans",
     "titleSignUp": "创建 imToken Fans 账号",

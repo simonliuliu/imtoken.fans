@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000 --hostname 127.0.0.1",
+    "dev": "next dev --port 4000 --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start --port 3000 --hostname 127.0.0.1",
+    "start": "next start --port 4000 --hostname 127.0.0.1",
     "lint": "eslint",
     "check-i18n": "node scripts/check-i18n.mjs",
-    "test:auth": "playwright test tests/product-hunter-auth.spec.ts"
+    "test:auth": "playwright test tests/product-hunter-auth.spec.ts",
+    "test:db:local": "node scripts/test-local-supabase.mjs",
+    "setup:dev-auth": "node --experimental-strip-types scripts/setup-local-dev-auth.mjs",
+    "test:dev-auth": "node --experimental-strip-types scripts/test-local-dev-auth.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
