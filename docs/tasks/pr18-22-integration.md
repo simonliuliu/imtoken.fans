@@ -17,3 +17,13 @@
 ## 检查与保留边界
 
 集成 i18n（1540 键）、类型、无警告 lint、Turbopack 生产构建通过；12 项 Composer、6 项认证、4 组产品 Action、21 项名称与19项通知隔离测试通过。独立联合迁移/0024兼容10项通过。新版真实反馈表单独立 14 项处理器/账号切换测试通过；受控三迁移事务也在隔离 PostgreSQL 演练通过（6 表逐行 JSON、ACL、enum COMMIT 后可用和无历史通知回灌）。目标迁移前只读基线：submissions41、profiles28、votes502、comments86、notifications9、feedback_posts2、feedback_comments0；新迁移尚未应用。普通论坛仍演示，不把新发布页当作真实论坛写入；视频/附件、反馈状态/合并专用通知及多连接并发另验。既有真实反馈/产品审核、媒体授权、账号隔离、历史互动和 XP 不可退化。真实 JWT/浏览器多账号成功流程需与隔离测试区分。
+
+## 实际合并与正式激活结果
+
+PR #23 已合并，main `bad9fd4ccb63ac9d30896bdf02d9e6233cf606ba`。GitHub 逐一确认 #18/#19/#20/#21/#22/#23 均 MERGED，未解决讨论为0。Vercel production `dpl_GVWGCxJVcadXGtyo4xQPXx9ce4xk` READY，代码检查成功。
+
+0026/0027/0028 已在原 Supabase 通过受控事务执行并 COMMIT，旧6表逐行JSON与ACL断言通过；原41投稿/86评论/9通知/2真实反馈保留。迁移时28个profile原样保留，之后只读统计29个，属于后续新增，未回写覆盖。历史票502不变、反馈评论0。PostgREST 公共follow_read=200，匿名notification_read和user_follows/notifications/notification_events原表访问=401；不回退到不安全原表。
+
+真实浏览器现有登录会话读取通知中心成功（真实JWT/空通知，无错误），只读检查未点击已读/清空/关注或发表真实内容。新版反馈表单可打开；旧 /submit/idea 及 ?type=idea 均转到产品页。中英首页、共创、独立发布页、通知及三个图片资源均HTTP200。
+
+角色写入/收发的回滚测试脚本已提供，但本轮未在目标库执行；此边界与隔离PGlite测试、真实JWT只读验证区分。真实多账号关注收发/发布、并发及完整业务验收仍待后续。正式页面复核和最终发布记录见本次收尾PR。
