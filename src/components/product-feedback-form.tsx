@@ -149,7 +149,7 @@ function FeedbackForm({ owner }: { owner: string | null }) {
   const setDetail = (key: string, value: string) => update({ details: { ...formRef.current.details, [key]: value } });
   function serializedDescription() {
     const names = form.kind === "bug" ? ["appVersion", "device", "steps", "expected", "actual"] : ["scenario", "proposal", "impact"];
-    const detailText = names.filter((key) => form.details[key]?.trim()).map((key) => `${t(`fields.${key}`)}: ${key === "device" && ["ios", "android", "browserExtension", "other"].includes(form.details[key]) ? t(`deviceOptions.${form.details[key]}`) : form.details[key].trim()}`).join("\n\n");
+    const detailText = names.filter((key) => form.details[key]?.trim()).map((key) => `${t(`fields.${key}`)}: ${key === "device" ? t(`deviceOptions.${form.details[key]}`) : form.details[key].trim()}`).join("\n\n");
     const kindLabel = t(form.kind === "bug" ? "bugType" : "suggestionType");
     return `${kindLabel}\n\n${form.body.trim()}${detailText ? `\n\n${detailText}` : ""}`;
   }
@@ -242,7 +242,7 @@ function FeedbackForm({ owner }: { owner: string | null }) {
       <p className="community-local-status">{t("feedbackRequirements")}</p>
       {needsLogin && <p role="status" className={styles.loginNotice}>{f("signInBeforePublish")}</p>}
       {error && <div id={errorId} ref={errorRegion} role="alert" tabIndex={-1} className={styles.submitError}><p>{error}</p></div>}
-      <button type={needsLogin ? "button" : "submit"} onClick={needsLogin ? continueSignIn : undefined} aria-describedby={error ? errorId : undefined} className="community-button" disabled={!ready || busy || legacyPending || finished || !needsLogin && !pending && (form.title.trim().length < 2 || form.body.trim().length < 2 || descriptionLength > 5000)}>{busy ? f("saving") : needsLogin ? f("signInPublish") : pending ? f("retryOriginal") : t("publishFeedback")}</button>
+      <button type={needsLogin ? "button" : "submit"} onClick={needsLogin ? continueSignIn : undefined} aria-describedby={error ? errorId : undefined} className="community-button" disabled={!ready || busy || legacyPending || finished}>{busy ? f("saving") : needsLogin ? f("signInPublish") : pending ? f("retryOriginal") : t("publishFeedback")}</button>
     </form>
   </div></div>;
 }
