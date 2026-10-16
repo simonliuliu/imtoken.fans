@@ -127,7 +127,6 @@ export function Composer({ section = "discussion", compact = false, owner, pageM
       router.push(`/community/feedback?category=wallet&idea=${result.data.id}`);
     } catch { if (mounted.current) showError(f("unexpected")); } finally { inFlight.current = false; if (mounted.current) setPending(false); }
   }
-  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent("/submit?type=feedback&composeFeedback=1")}`;
   const content = <div className="community-dialog-content"><div className="community-dialog-heading"><h2 id={dialogTitle}>{realFeedback ? f("composeTitle") : t("composeTitle")}</h2>{!pageMode && <button type="button" className="community-icon-button" aria-label={realFeedback ? f("close") : t("close")} disabled={pending} onClick={() => dialog.current?.close()}>×</button>}</div>
       <p className="community-compose-notice">{realFeedback ? f("publishNotice") : t("composeNotice")}</p>
       {preview ? <div className="community-preview-result" role="status"><span className="community-demo-label">{t("previewOnly")}</span><p className="community-preview-category">{t(`sections.${board}.name`)} › {t(`categories.${category}`)}</p><h3>{title}</h3><p className="community-preview-body">{body}</p><button type="button" className="community-button community-button-outline" onClick={() => setPreview(false)}>{t("editPreview")}</button></div> : <form onSubmit={submit}>

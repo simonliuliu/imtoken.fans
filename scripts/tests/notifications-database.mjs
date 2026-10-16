@@ -13,7 +13,7 @@ const legacyPost=(await db.query("insert into submissions(submitted_by,status) v
 const legacyComment=(await db.query("insert into comments(submission_id,user_id,status) values($1,$2,'published') returning id",[legacyPost,ids.admin])).rows[0].id;
 await db.query("insert into notifications(user_id,actor_id,type,submission_id,comment_id) values($1,$2,'reply',$3,$4)",[ids.member,ids.admin,legacyPost,legacyComment]);
 await db.exec('grant insert on notifications to service_role');
-for(const name of ['0025_product_feedback.sql','0026_following_notifications.sql'])await db.exec(await fs.readFile(new URL('../../supabase/migrations/'+name,import.meta.url),'utf8'));
+for(const name of ['0025_product_feedback.sql','0028_following_notifications.sql'])await db.exec(await fs.readFile(new URL('../../supabase/migrations/'+name,import.meta.url),'utf8'));
 const rpc=(sql,args=[])=>db.query(sql,args).then(r=>r.rows[0]?.result);
 const read=(who)=>as('authenticated',who,()=>rpc('select notification_read($1) result',[ids[who]]));
 await ok('follow own subscription',()=>as('authenticated','user',()=>rpc('select follow_write($1,$2,true)',[ids.user,ids.other])));

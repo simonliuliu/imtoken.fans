@@ -1,13 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { useLocale } from "next-intl";
-import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { AuthLoading } from "@/components/auth-loading";
-import { getSignInHref } from "@/lib/auth-navigation";
+import { useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { AuthLoading } from "@/components/auth-loading";
+import { getSignInHref } from "@/lib/auth-navigation";
 import { createSubmission } from "@/app/actions/submissions";
 import { deleteSubmissionMedia, uploadSubmissionMedia } from "@/app/actions/media";
 import { getSubmissionMediaUrl, MAX_SCREENSHOTS, MAX_SOCIAL_LINKS, MAX_TEAM_MEMBERS } from "@/lib/media";
@@ -27,8 +25,6 @@ import type {
   SocialLink,
   TeamMember,
 } from "@/lib/types";
-
-type SubmitType = "product" | "idea";
 
 interface Draft {
   title: string;
@@ -73,30 +69,21 @@ function emptyDraft(): Draft {
 const DESCRIPTION_MIN = 10;
 const DRAFT_STORAGE_KEY = "imtoken-fans-submission-drafts-v2";
 
-export function ProductSubmissionForm({ fixedType }: { fixedType?: SubmitType }) {
-  return <Suspense fallback={<AuthLoading />}><ProductSubmissionFormContent fixedType={fixedType} /></Suspense>;
+export function ProductSubmissionForm() {
+  const { user } = useAuth();
+  // Switching accounts must recreate all in-memory form state.
+  return <SubmitPageContent key={user?.id ?? "anonymous"} />;
 }
 
-function ProductSubmissionFormContent({ fixedType }: { fixedType?: SubmitType }) {
-  const { user, loading, sessionEpoch } = useAuth();
-  const searchParams = useSearchParams();
-  const queryType = searchParams.get("type") === "idea" ? "idea" : "product";
-  const type = fixedType ?? queryType;
-  return <SubmitPageForUser key={`${user?.id ?? "anonymous"}:${sessionEpoch}:${type}`} fixedType={type} loading={loading} />;
-}
-
-function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; loading: boolean }) {
+function SubmitPageContent() {
   const t = useTranslations("submit");
   const tc = useTranslations("common");
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const draftStorageKey = user ? `${DRAFT_STORAGE_KEY}:${user.id}` : null;
   const locale = useLocale();
   const router = useRouter();
-  const signInHref = getSignInHref(fixedType === "idea" ? "/submit/idea" : "/submit/product", locale);
-  useEffect(() => { if (!loading && !user) router.replace(signInHref); }, [loading, user, router, signInHref]);
-  const draftStorageKey = user ? `${DRAFT_STORAGE_KEY}:${user.id}` : null;
-
-  const [drafts, setDrafts] = useState<Record<SubmitType, Draft>>({ product: emptyDraft(), idea: emptyDraft() });
-  const [type, setType] = useState<SubmitType>(fixedType);
+  const [drafts, setDrafts] = useState({ product: emptyDraft() });
+  const signInHref = getSignInHref("/submit?type=product", locale);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -104,10 +91,20 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
   const [draftReady, setDraftReady] = useState(false);
 
   useEffect(() => {
+    if (!loading && !user) router.replace(signInHref);
+  }, [loading, user, router, signInHref]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
         const saved = draftStorageKey ? window.localStorage.getItem(draftStorageKey) : null;
-        if (saved) setDrafts(JSON.parse(saved) as Record<SubmitType, Draft>);
+        if (saved) {
+          const stored = JSON.parse(saved);
+          if (stored && typeof stored === "object" && stored.product && typeof stored.product === "object") {
+            // Keep legacy drafts in storage, but only restore/edit the product draft.
+            setDrafts({ ...stored, product: { ...emptyDraft(), ...stored.product } });
+          }
+        }
       } catch {
         if (draftStorageKey) window.localStorage.removeItem(draftStorageKey);
       } finally {
@@ -122,10 +119,10 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
     window.localStorage.setItem(draftStorageKey, JSON.stringify(drafts));
   }, [draftReady, drafts, draftStorageKey]);
 
-  const draft = drafts[type];
+  const draft = drafts.product;
 
   function updateDraft(patch: Partial<Draft>) {
-    setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], ...patch } }));
+    setDrafts((prev) => ({ ...prev, product: { ...prev.product, ...patch } }));
   }
 
   if (loading || !user) return <AuthLoading />;
@@ -138,20 +135,14 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
           {published ? t("successPublished") : t("successPending")}
         </h1>
         <p className="mt-2 text-sm text-muted">
-          {published
-            ? type === "product"
-              ? t("successPublishedProductBody")
-              : t("successPublishedIdeaBody")
-            : type === "product"
-              ? t("successPendingProductBody")
-              : t("successPendingIdeaBody")}
+          {published ? t("successPublishedProductBody") : t("successPendingProductBody")}
         </p>
         <div className="mt-6 flex gap-3">
           <button
             type="button"
             onClick={() => {
               setSubmitted(false);
-              setDrafts((prev) => ({ ...prev, [type]: emptyDraft() }));
+              setDrafts((prev) => ({ ...prev, product: emptyDraft() }));
             }}
             className="rounded-full border border-line px-5 py-2 text-sm font-medium text-ink transition-colors hover:border-brand"
           >
@@ -168,17 +159,15 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
     );
   }
 
-  const isProduct = type === "product";
   const titleOk = draft.title.trim().length > 1;
   const taglineOk = draft.tagline.trim().length > 1;
   const descriptionOk = draft.description.trim().length >= DESCRIPTION_MIN;
   const productReady =
-    !isProduct ||
-    (Boolean(draft.websiteUrl.trim()) &&
-      Boolean(draft.logoPath) &&
-      draft.screenshotPaths.length > 0 &&
-      draft.tags.length > 0 &&
-      draft.productPlatforms.length > 0);
+    Boolean(draft.websiteUrl.trim()) &&
+    Boolean(draft.logoPath) &&
+    draft.screenshotPaths.length > 0 &&
+    draft.tags.length > 0 &&
+    draft.productPlatforms.length > 0;
   const canSubmit = titleOk && taglineOk && descriptionOk && productReady && !busy;
 
   async function handleSubmit(e: FormEvent) {
@@ -187,7 +176,7 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
     setError(null);
     setBusy(true);
     const result = await createSubmission({
-      type,
+      type: "product",
       title: draft.title,
       tagline: draft.tagline,
       description: draft.description,
@@ -220,30 +209,13 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
         <h1 className="text-3xl font-extrabold text-ink">{t("title")}</h1>
         <p className="mt-2 text-muted">{t("subtitle", { name: user.name })}</p>
 
-        {!fixedType && <div className="mt-8 grid grid-cols-2 gap-4">
-          <TypeCard
-            icon="🚀"
-            title={t("productTitle")}
-            desc={t("productDesc")}
-            active={type === "product"}
-            onClick={() => setType("product")}
-          />
-          <TypeCard
-            icon="💡"
-            title={t("ideaTitle")}
-            desc={t("ideaDesc")}
-            active={type === "idea"}
-            onClick={() => setType("idea")}
-          />
-        </div>}
-
         <form className="mt-8 flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6" onSubmit={handleSubmit}>
           <Field
             label={t("fieldTitle")}
             placeholder={t("fieldTitlePlaceholder")}
             value={draft.title}
             onChange={(v) => updateDraft({ title: v })}
-            maxLength={isProduct ? 60 : 100}
+            maxLength={60}
             hint={!titleOk && draft.title.length > 0 ? t("minChars", { min: 2 }) : undefined}
           />
           <Field
@@ -251,16 +223,12 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
             placeholder={t("fieldTaglinePlaceholder")}
             value={draft.tagline}
             onChange={(v) => updateDraft({ tagline: v })}
-            maxLength={isProduct ? 60 : 140}
+            maxLength={60}
             hint={!taglineOk && draft.tagline.length > 0 ? t("minChars", { min: 2 }) : undefined}
           />
           <Field
             label={t("fieldDescription")}
-            placeholder={
-              isProduct
-                ? t("fieldDescriptionPlaceholderProduct")
-                : t("fieldDescriptionPlaceholderIdea")
-            }
+            placeholder={t("fieldDescriptionPlaceholderProduct")}
             value={draft.description}
             onChange={(v) => updateDraft({ description: v })}
             textarea
@@ -279,44 +247,38 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
             <TagPicker value={draft.tags} onChange={(tags) => updateDraft({ tags })} max={MAX_TAGS} />
           </div>
 
-          {/* 点子还没做出来，官网 / Logo / 团队 / 社交这几项对它没有意义——
-              留着只会让人以为"没填就不完整"。所以只在提交产品时才出现。 */}
-          {isProduct && (
-            <>
-              <Field
-                label={t("fieldWebsite")}
-                placeholder="https://..."
-                value={draft.websiteUrl}
-                onChange={(v) => updateDraft({ websiteUrl: v })}
-                maxLength={300}
-                hint={t("fieldWebsiteHint")}
-              />
-              <div className="grid gap-4 sm:grid-cols-3">
-                <SelectField
-                  label={t("fieldStage")}
-                  value={draft.launchStage}
-                  onChange={(value) => updateDraft({ launchStage: value as ProductLaunchStage })}
-                  options={PRODUCT_LAUNCH_STAGES.map((value) => ({ value, label: t(`stageOptions.${value}`) }))}
-                />
-                <SelectField
-                  label={t("fieldPricing")}
-                  value={draft.pricingType}
-                  onChange={(value) => updateDraft({ pricingType: value as ProductPricing })}
-                  options={PRODUCT_PRICING.map((value) => ({ value, label: t(`pricingOptions.${value}`) }))}
-                />
-                <SelectField
-                  label={t("fieldRelationship")}
-                  value={draft.makerRelationship}
-                  onChange={(value) => updateDraft({ makerRelationship: value as MakerRelationship })}
-                  options={MAKER_RELATIONSHIPS.map((value) => ({ value, label: t(`relationshipOptions.${value}`) }))}
-                />
-              </div>
-              <PlatformPicker
-                value={draft.productPlatforms}
-                onChange={(productPlatforms) => updateDraft({ productPlatforms })}
-              />
-            </>
-          )}
+          <Field
+            label={t("fieldWebsite")}
+            placeholder="https://..."
+            value={draft.websiteUrl}
+            onChange={(v) => updateDraft({ websiteUrl: v })}
+            maxLength={300}
+            hint={t("fieldWebsiteHint")}
+          />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <SelectField
+              label={t("fieldStage")}
+              value={draft.launchStage}
+              onChange={(value) => updateDraft({ launchStage: value as ProductLaunchStage })}
+              options={PRODUCT_LAUNCH_STAGES.map((value) => ({ value, label: t(`stageOptions.${value}`) }))}
+            />
+            <SelectField
+              label={t("fieldPricing")}
+              value={draft.pricingType}
+              onChange={(value) => updateDraft({ pricingType: value as ProductPricing })}
+              options={PRODUCT_PRICING.map((value) => ({ value, label: t(`pricingOptions.${value}`) }))}
+            />
+            <SelectField
+              label={t("fieldRelationship")}
+              value={draft.makerRelationship}
+              onChange={(value) => updateDraft({ makerRelationship: value as MakerRelationship })}
+              options={MAKER_RELATIONSHIPS.map((value) => ({ value, label: t(`relationshipOptions.${value}`) }))}
+            />
+          </div>
+          <PlatformPicker
+            value={draft.productPlatforms}
+            onChange={(productPlatforms) => updateDraft({ productPlatforms })}
+          />
           <Field
             label={t("fieldVideo")}
             placeholder={t("fieldVideoPlaceholder")}
@@ -324,40 +286,32 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
             onChange={(v) => updateDraft({ videoUrl: v })}
           />
 
-          {isProduct && (
-            <LogoField logoPath={draft.logoPath} onChange={(path) => updateDraft({ logoPath: path })} />
-          )}
+          <LogoField logoPath={draft.logoPath} onChange={(path) => updateDraft({ logoPath: path })} />
           <ScreenshotsField
             paths={draft.screenshotPaths}
             onChange={(paths) => updateDraft({ screenshotPaths: paths })}
           />
-          {isProduct && (
-            <>
-              <Field
-                label={t("fieldMakerNote")}
-                placeholder={t("fieldMakerNotePlaceholder")}
-                value={draft.makerNote}
-                onChange={(value) => updateDraft({ makerNote: value })}
-                textarea
-                maxLength={1200}
-              />
-              <Field
-                label={t("fieldFeedbackPrompt")}
-                placeholder={t("fieldFeedbackPromptPlaceholder")}
-                value={draft.feedbackPrompt}
-                onChange={(value) => updateDraft({ feedbackPrompt: value })}
-                textarea
-                maxLength={500}
-              />
-            </>
-          )}
-          {isProduct && <TeamField team={draft.team} onChange={(team) => updateDraft({ team })} />}
-          {isProduct && (
-            <SocialLinksField
-              socialLinks={draft.socialLinks}
-              onChange={(socialLinks) => updateDraft({ socialLinks })}
-            />
-          )}
+          <Field
+            label={t("fieldMakerNote")}
+            placeholder={t("fieldMakerNotePlaceholder")}
+            value={draft.makerNote}
+            onChange={(value) => updateDraft({ makerNote: value })}
+            textarea
+            maxLength={1200}
+          />
+          <Field
+            label={t("fieldFeedbackPrompt")}
+            placeholder={t("fieldFeedbackPromptPlaceholder")}
+            value={draft.feedbackPrompt}
+            onChange={(value) => updateDraft({ feedbackPrompt: value })}
+            textarea
+            maxLength={500}
+          />
+          <TeamField team={draft.team} onChange={(team) => updateDraft({ team })} />
+          <SocialLinksField
+            socialLinks={draft.socialLinks}
+            onChange={(socialLinks) => updateDraft({ socialLinks })}
+          />
 
           <div className="rounded-xl bg-surface-2 p-4 text-sm text-muted">
             {t("processTitle")}
@@ -382,53 +336,6 @@ function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; load
         </form>
       </div>
     </div>
-  );
-}
-
-function TypeCard({
-  icon,
-  title,
-  desc,
-  active,
-  onClick,
-}: {
-  icon: string;
-  title: string;
-  desc: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`relative flex items-start gap-3 rounded-2xl border-2 p-5 text-left transition-all ${
-        active
-          ? "border-brand bg-brand-soft shadow-[0_0_0_4px_var(--color-brand-soft)]"
-          : "border-line bg-surface hover:border-brand/50 hover:bg-surface-2"
-      }`}
-    >
-      <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl transition-colors ${
-          active ? "bg-brand text-white" : "bg-surface-2 text-ink"
-        }`}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block font-display text-base font-bold text-ink">{title}</span>
-        <span className="mt-0.5 block text-xs leading-snug text-muted">{desc}</span>
-      </span>
-      <span
-        className={`absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors ${
-          active ? "border-brand bg-brand text-white" : "border-line text-transparent"
-        }`}
-        aria-hidden
-      >
-        ✓
-      </span>
-    </button>
   );
 }
 

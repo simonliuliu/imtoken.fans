@@ -41,7 +41,7 @@ QA 发现并已修复：直接 REST 插入 published 评论绕审核；迁移前
 
 ## 激活、限制与下一步
 
-新增 [0026 迁移](../../supabase/migrations/0026_following_notifications.sql) 已准备；review 后先迁移、确认 COMMIT 与 [只读检查](../operations/notifications-post-migration-check.sql)，再发布新应用。新 RPC 权限与客户端须配套：不能在未迁移数据库发布新客户端，也不能在新权限下直接退回旧原表铃铛。旧系统当前继续运行，本轮没有改变线上 9 条通知或执行迁移。迁移与回退细则见 [任务卡](../tasks/notifications-following.md)。
+新增 [0026 迁移](../../supabase/migrations/0028_following_notifications.sql) 已准备；review 后先迁移、确认 COMMIT 与 [只读检查](../operations/notifications-post-migration-check.sql)，再发布新应用。新 RPC 权限与客户端须配套：不能在未迁移数据库发布新客户端，也不能在新权限下直接退回旧原表铃铛。旧系统当前继续运行，本轮没有改变线上 9 条通知或执行迁移。迁移与回退细则见 [任务卡](../tasks/notifications-following.md)。
 
 未覆盖真实 JWT/PostgREST、多账号浏览器关注/发帖/回复/撤关、人工/AI 审核全流程和多连接并发。现有 SQL 测试为独立临时 PostgreSQL 模拟角色，并非对共享 Supabase 的写入验收。
 

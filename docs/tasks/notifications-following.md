@@ -35,7 +35,7 @@
 
 ## 迁移与回退
 
-新增 `0026_following_notifications.sql`，不改旧 SQL。补齐缺失系统 enum，新增 user_follows、独立 notification_events 去重账本，notifications 追加可空事件/反馈关联，不删除原消息/内容/XP。通知原表对客户端撤销直接读改删，统一受限 RPC；旧应用过渡期无事件凭据的评论旁路插入被抑制，避免重复/待审核通知；评论 INSERT 新增 restrictive 策略，防直接写 published 绕审核。
+新增 `0028_following_notifications.sql`，不改旧 SQL。补齐缺失系统 enum，新增 user_follows、独立 notification_events 去重账本，notifications 追加可空事件/反馈关联，不删除原消息/内容/XP。通知原表对客户端撤销直接读改删，统一受限 RPC；旧应用过渡期无事件凭据的评论旁路插入被抑制，避免重复/待审核通知；评论 INSERT 新增 restrictive 策略，防直接写 published 绕审核。
 
 **数据库优先发布**：review 后核对共享库与备份，再以事务应用迁移并确认 COMMIT/权限/历史数量，最后发布新客户端。新客户端不在缺迁移时降级到不受公开投影约束的旧 join；失败明确提示，不能当空列表。当前共享库连着已发布站点，本批只读核验，未写迁移/真实通知或发布应用；线上原 9 条通知仍由原版本服务。
 

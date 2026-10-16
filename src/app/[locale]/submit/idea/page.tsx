@@ -1,5 +1,6 @@
-import { ProductSubmissionForm } from "@/components/product-submission-form";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 
-export default function IdeaSubmitPage() {
-  return <ProductSubmissionForm fixedType="idea" />;
+export default async function LegacyIdeaSubmitPage() {
+  redirect({ href: "/submit/product", locale: await getLocale() });
 }

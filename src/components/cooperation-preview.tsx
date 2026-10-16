@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { saveFeedbackDraft, takeFeedbackDraft } from "@/lib/feedback-drafts";
 import { Link, useRouter } from "@/i18n/navigation";
 import { readFeedback, writeFeedback } from "@/app/actions/feedback";
-import { FEEDBACK_MODULES, FEEDBACK_STATES, FEEDBACK_MARKS, FEEDBACK_CHANGED, type FeedbackPost, type FeedbackComment, type FeedbackData, type FeedbackEdit, type FeedbackMark, type FeedbackModule, type FeedbackState } from "@/lib/feedback";
+import { FEEDBACK_MODULES, FEEDBACK_STATES, FEEDBACK_MARKS, FEEDBACK_CHANGED, FEEDBACK_COMPOSE, type FeedbackPost, type FeedbackComment, type FeedbackData, type FeedbackEdit, type FeedbackMark, type FeedbackModule, type FeedbackState } from "@/lib/feedback";
 import type { CommunityFeedSort } from "@/components/co-creation-feed-context";
 import styles from "./cooperation-preview.module.css";
 import { CommentToolbarIcon } from "@/components/comment-toolbar-icon";
