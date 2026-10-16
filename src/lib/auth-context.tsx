@@ -19,6 +19,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAdmin: boolean;
   loading: boolean;
+  sessionEpoch: number;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(() => isSupabaseConfigured());
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const rawUserRef = useRef<User | null>(null);
   const sessionVersionRef = useRef(0);
 
@@ -46,6 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function syncSession(rawUser: User | null) {
       const version = ++sessionVersionRef.current;
+      if (rawUserRef.current?.id !== rawUser?.id) {
+        setSessionEpoch((value) => value + 1);
+        // Immediately hide the old account while the new profile is being resolved.
+        setUser(null);
+        setIsAdmin(false);
+        setLoading(Boolean(rawUser));
+      }
       rawUserRef.current = rawUser;
       const base = deriveUser(rawUser);
       if (!rawUser || !base) {
@@ -144,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     sessionVersionRef.current++;
+    setSessionEpoch((value) => value + 1);
     rawUserRef.current = null;
     setUser(null);
     setIsAdmin(false);
@@ -155,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, sessionEpoch, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

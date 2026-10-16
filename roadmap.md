@@ -131,12 +131,18 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 ## 最新执行记录
 
 2026-10-16 Product Hunter 登录体验：在 `codex/product-hunter-auth-ux` 修复会话加载误判、统一投稿/支持/评分/评论登录入口与多语言回跳、账号切换和个人状态刷新；10 条本地模拟浏览器回归、i18n（1249 键）、lint、build 与独立 QA 通过。真实外部登录/数据库未验；不包含旧审核/RLS与草稿问题修复，见 [review](docs/reviews/product-hunter-auth-ux.md)。
+2026-10-16 Jack反馈真实接入：合入最新main67a5b53登录/数据库安全修复，新增0025反馈专用迁移及RPC；统一「发帖」产品反馈模块字段，真实Admin编辑/审计、IDEA和评论支持、合并/撤销持久化契约；移除虚构IDEA种子及假管理员入口。i18n1432键、lint、tsc、Webpack构建、主线6项安全回归、模拟PG71项及独立会话/草稿审查通过；浏览器表单/缺配置失败路径/手机通过。目标Supabase0025未执行，真实账号保存刷新和多连接并发待部署验证；通知/视频/旧审核队列未接，不标完整M3验收，见[任务记录](docs/tasks/product-feedback-persistence.md)。
+
+2026-10-16 Jack产品反馈主线整合：从最新`origin/main`（e1c40b1）创建`codex/jack-product-cooperation-feedback`，将IDEA原型嵌入「产品反馈」分类，保留主线全部/社区产品/公告和产品猎手入口；分类切换保留本地状态。i18n1374键、lint、tsc、Webpack构建通过，浏览器中英/390px/分类与票数保留验证，见[整合任务](docs/tasks/jack-product-cooperation-feedback.md)。未上线、未写库、未合并main，等待review。
 
 2026-10-15 分支整合与本地复核：`codex/community-integration` 已保存首页横幅/排序/评论数更新，合入协作规则与 Vercel 说明；路线图冲突保留双方记录。i18n1092键、lint、build通过，本地固定3000运行，中英首页/四板块/详情/图片及横幅、排序、本地支持验证通过。品牌统一分支仅有未完成任务卡，不合入。远端 main 仍需其他维护者批准PR；不绕过保护，详见[整合记录](docs/tasks/community-integration.md)。
 
 2026-10-15 团队协作：按用户要求将 GitHub 仓库改为公开；全历史凭证复查未发现本地配置密钥或常见令牌。新增 `CONTRIBUTING.md`、PR 模板及 AGENTS 规则，要求开工同步主线、独立任务分支、每次提交前同步远端、冲突处理与 PR 审查。此次规则更新在 `codex/team-git-workflow` 分支交付；当前未跟踪的 `docs/design/community-banners/` 属其他工作，保留且不提交。仅协作设置与文档变更，不推进产品阶段。
 
 2026-10-15 Vercel 自动预览：已按用户授权创建 `simonliulius-projects/imtoken-fans`，连接 GitHub 本仓库；首次 main 构建与分支预览验证进行中。未配置数据库/钱包/AI 密钥，不修改数据；当前为虚拟内容演示，真实业务验收与产品 review 状态不变。详见[任务记录](docs/tasks/vercel-auto-preview.md)。
+2026-10-16 产品共创 IDEA 原型已交付：按用户提供的 Canny Demo 实现提交/查重、IDEA及评论/回复独立投票、Admin演示编辑/公开标记、最早主帖合并/撤销和进展看板；i18n1207键、lint、tsc、Webpack构建通过，默认Turbopack受本机端口限制失败。中英/390px及浏览器核心交互验证，独立QA发现1项P2并修复复查。详见[任务卡](docs/tasks/cooperation-idea-preview.md)与[review](docs/reviews/cooperation-idea-preview.md)。等待用户review；本地演示不计为M3真实业务完成，不写数据库或接通知/上传。
+
+2026-10-15 产品反馈专项调研：完成 [Canny 调研与实施建议](docs/tasks/product-feedback-research.md)，核对本地演示、旧票种、媒体与权限缺口；提出共创反馈专用列表/表单/时间线、多来源证据及分批闭环。只读查阅 Canny 官方资料，文档交付；未实现应用、未验远程库、未执行迁移或新增渠道，M3 待办和用户 review 门槛不变。
 
 2026-10-15 GitHub 首次保存：用户授权创建私有仓库 [simonliuliu/imtoken.fans](https://github.com/simonliuliu/imtoken.fans) 并提交当前工程。待提交文件的本地配置值/常见密钥扫描未发现真实凭证，确认 `.env.local`、依赖及构建结果被忽略；i18n（1084键）、lint、build通过。README 补充新手保存说明；本次不涉及网站部署或数据库变更，当前产品 review 状态不变。
 

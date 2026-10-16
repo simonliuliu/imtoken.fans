@@ -7,11 +7,11 @@ import { isCommunitySection, SECTION_CATEGORIES } from "@/lib/community-demo";
 
 export default async function CommunityBoardPage({ params, searchParams }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ category?: string | string[] }>;
+  searchParams: Promise<{ category?: string | string[]; idea?: string | string[] }>;
 }) {
   const { section } = await params;
   if (!isCommunitySection(section)) notFound();
-  const { category } = await searchParams;
+  const { category, idea } = await searchParams;
   const initialCategory = typeof category === "string" && SECTION_CATEGORIES[section].includes(category) ? category : "all";
   const t = await getTranslations("community");
 
@@ -20,6 +20,7 @@ export default async function CommunityBoardPage({ params, searchParams }: {
       key={`${section}:${initialCategory}`}
       section={section}
       initialCategory={initialCategory}
+      initialId={typeof idea === "string" ? idea : null}
       productsContent={section === "feedback" ? (
         <Suspense fallback={<p className="community-panel p-6 text-sm text-muted" role="status">{t("loading")}</p>}>
           <CommunityProducts />
