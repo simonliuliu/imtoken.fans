@@ -830,7 +830,8 @@
     "passwordTooShort": "密码至少需要 6 位",
     "nicknameRequired": "请填写昵称",
     "passwordMismatch": "两次输入的密码不一致",
-    "needsEmailConfirmation": "注册成功，请查收邮箱完成验证后再登录"
+    "needsEmailConfirmation": "注册成功，请查收邮箱完成验证后再登录",
+    "accountBoundary": "这是 imToken Fans 社区账号登录，不是钱包恢复或解锁。请使用独立的社区密码；不要输入钱包密码、助记词或私钥。"
   },
   "wallet": {
     "metadataDescription": "imToken Fans：imToken 钱包用户交流社区。",

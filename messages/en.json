@@ -830,7 +830,8 @@
     "passwordTooShort": "Password must be at least 6 characters",
     "nicknameRequired": "Please enter a display name",
     "passwordMismatch": "The two passwords don't match",
-    "needsEmailConfirmation": "Account created — check your email to verify it, then sign in"
+    "needsEmailConfirmation": "Account created — check your email to verify it, then sign in",
+    "accountBoundary": "Sign in to your imToken Fans community account, not to restore or unlock a wallet. Use a separate community password. Never enter your wallet password, recovery phrase, or private key."
   },
   "wallet": {
     "metadataDescription": "imToken Fans: a community for imToken wallet users.",

@@ -221,3 +221,7 @@ PR #1–#4 已汇入 `codex/community-integration`（整合提交 `a3d0122`；20
 ### 本批上线结果更新
 
 PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品限制/0028关注通知已受控执行，历史内容、互动、9条消息和2条真实反馈保留；真实登录会话通知只读与新版发布页检查通过，旧idea投稿跳转产品页。真实多账号收发、并发、视频/附件、普通论坛持久化及视觉review继续保留。详见 [本批记录](docs/tasks/pr18-22-integration.md)；收尾PR仅同步进度，不改变业务代码。
+
+## 2026-10-16 Dangerous 安全标记排查
+
+Google公开报告已确认 imtoken-fans.vercel.app 为 unsafe，类别是诱导提供个人信息或下载软件。独立代码审计未发现盗取/注入路径，生产依赖audit0；这不等于误报。已准备钱包品牌/图标修正、社区凭证边界提示和Search Console所有权验证文件，i18n1541键、lint、build与本地静态路径检查通过。尚未解除；待所有者合并发布后验证所有权、读取具体受影响URL并完成修复/复审，见[任务记录](docs/tasks/site-dangerous-investigation.md)。

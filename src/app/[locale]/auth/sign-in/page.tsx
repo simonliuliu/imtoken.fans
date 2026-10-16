@@ -201,6 +201,8 @@ function SignInForm() {
         </p>
       </div>
 
+      <p className="mb-4 text-xs leading-6 text-muted">{t("accountBoundary")}</p>
+
       {!configured && (
         <div className="mb-4 rounded-xl bg-risk-soft px-4 py-3 text-xs text-risk">
           {t("notConfigured")}
