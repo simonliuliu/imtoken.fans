@@ -1767,7 +1767,15 @@
     "emptyColumn": "当前页暂无反馈",
     "signInBeforePublish": "发布前请先登录。你可以先填写内容，点击下方按钮将保留草稿，登录后继续发布。",
     "signInPublish": "登录后继续发布",
-    "similarSearchError": "相似反馈搜索暂不可用：{error} 你仍可继续填写。"
+    "similarSearchError": "相似反馈搜索暂不可用：{error} 你仍可继续填写。",
+    "invalidDraft": "请填写至少两个非空白字符的标题和问题描述。",
+    "pendingRetry": "上次提交结果尚未确认。内容已锁定；请重试原提交以确认结果，不会重复发布。",
+    "retryOriginal": "重试并确认原提交",
+    "legacyPending": "发现旧版本未确认的提交。请先查看原反馈；也可用原编号与当前恢复内容重试。若内容不一致，将保留冲突提示，不会另发一条。",
+    "checkPublished": "查看已发布反馈",
+    "retryLegacy": "使用原编号重试",
+    "reloadDraft": "重新读取草稿",
+    "persistentDraftUnavailable": "浏览器无法保存或恢复草稿。请复制内容备份，暂勿离开页面；为避免重复发布，保存成功前不会发送新提交。"
   },
   "feedbackErrors": {
     "configuration": "产品反馈数据服务尚未配置，请联系管理员完成连接后重试。",

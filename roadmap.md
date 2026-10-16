@@ -230,3 +230,11 @@ PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品�
 - [ ] 本批PR合入及应用发布；当前线上普通社区仍是旧演示界面，待用户review。
 
 见 [任务卡](docs/tasks/real-community-interactions.md) 与 [实际验收](docs/reviews/real-community-interactions.md)。虚构正文不等于交互可继续虚构，检查、迁移、PR/发布和用户 review 分别记录。
+
+## 2026-10-16 反馈Review三项修复
+
+在独立`codex/feedback-review-fixes`修复持续草稿/查重回跳、未确认提交固定快照与UUID重试、新增0029数据库JS空白校验。当前表单26项、SQL28项、独立QA额外6项及旧Composer12项通过；1548键i18n、lint、生产Webpack构建与中英桌面/390px、本地虚拟账号登录续写及模拟已保存响应失败→原编号重试无重复通过。正式站与目标库尚未激活0029，不标线上完成；图片/视频明确留下一阶段。见[任务](docs/tasks/feedback-review-fixes.md)及[Review](docs/reviews/feedback-review-fixes.md)，交用户查看本地效果。
+
+## 2026-10-16 PR #25 / #27 整合
+
+反馈持续草稿与原样重试、普通社区真实互动共同整合；迁移重复编号已顺延反馈为0031，保留已执行社区0029/0030。验证、共享库激活与正式部署分别记录于[集成任务](docs/tasks/pr25-27-integration.md)。

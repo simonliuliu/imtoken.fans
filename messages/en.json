@@ -1767,7 +1767,15 @@
     "emptyColumn": "No feedback on this page",
     "signInBeforePublish": "Sign in before publishing. You can write first; the button below keeps your draft so you can continue after signing in.",
     "signInPublish": "Sign in to continue publishing",
-    "similarSearchError": "Similar feedback search is unavailable: {error} You can continue writing."
+    "similarSearchError": "Similar feedback search is unavailable: {error} You can continue writing.",
+    "invalidDraft": "Enter a title and description with at least two non-whitespace characters.",
+    "pendingRetry": "The previous submission is not confirmed. Your content is locked. Retry the original submission to confirm its result without publishing twice.",
+    "retryOriginal": "Retry original submission",
+    "legacyPending": "An older submission is unconfirmed. Check the original feedback or retry its original ID with the recovered content. Different content will show a conflict without publishing another post.",
+    "checkPublished": "Check published feedback",
+    "retryLegacy": "Retry with original ID",
+    "reloadDraft": "Reload draft",
+    "persistentDraftUnavailable": "Your browser could not save or restore the draft. Copy your text before leaving. New submissions are sent only after the draft is saved to prevent duplicates."
   },
   "feedbackErrors": {
     "configuration": "The feedback data service is not configured. Contact an admin to connect it and retry.",
