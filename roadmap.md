@@ -120,6 +120,15 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 
 2026-10-16 局部更新：首页五个数字币人改为直接访问用户指定的 B-Man 综合地址；综合交流保留角色预览。双语、lint、build、桌面/手机实际导航检查通过，待 PR / 用户 review，未部署。见 [外链任务](docs/tasks/M1-token-personas-external-link.md) 与 [检查记录](docs/reviews/M1-token-personas-external-link.md)。
 
+## 原站交互继承 · 2026-10-16 用户追加
+
+- [x] 对照旧 imAihunt：评论/回复、发布、等级/XP、后台、签到/抽奖，记录复用点和新社区缺口。
+- [x] 批次 A：示例线程评论与真实反馈评论呈现、独立分类发布页；保留真实反馈与产品/点子投稿。1518 键 i18n、lint、build、6 项安全回归、独立 QA 及中英桌面/手机检查通过；localhost:3000 可预览，等待用户 review。
+- [ ] 批次 B：按 M2 新内容目标接入真实论坛评论/通知/审核，保留历史链接和 XP。
+- [ ] 批次 C：按新内容/贡献规则适配原成长、后台和活动，分阶段 QA / review。
+
+[任务卡](docs/tasks/legacy-community-experience.md) · [代码盘点](docs/reviews/legacy-community-code-audit.md)。本批不将旧源码复用标为新业务验收。
+
 ## M6 · 运营增强 · P2
 
 - [ ] 关注/收藏、定向更新通知。

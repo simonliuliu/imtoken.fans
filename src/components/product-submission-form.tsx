@@ -1,11 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { useLocale, useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AuthLoading } from "@/components/auth-loading";
 import { getSignInHref } from "@/lib/auth-navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useAuth } from "@/lib/auth-context";
 import { createSubmission } from "@/app/actions/submissions";
 import { deleteSubmissionMedia, uploadSubmissionMedia } from "@/app/actions/media";
 import { getSubmissionMediaUrl, MAX_SCREENSHOTS, MAX_SOCIAL_LINKS, MAX_TEAM_MEMBERS } from "@/lib/media";
@@ -71,29 +73,35 @@ function emptyDraft(): Draft {
 const DESCRIPTION_MIN = 10;
 const DRAFT_STORAGE_KEY = "imtoken-fans-submission-drafts-v2";
 
-export function ProductSubmissionForm({ fixedType = "product" }: { fixedType?: SubmitType }) {
-  const { user } = useAuth();
-  // Switching accounts must recreate all in-memory form state.
-  return <Suspense fallback={<AuthLoading />}><SubmitPageContent key={`${user?.id ?? "anonymous"}:${fixedType}`} fixedType={fixedType} /></Suspense>;
+export function ProductSubmissionForm({ fixedType }: { fixedType?: SubmitType }) {
+  return <Suspense fallback={<AuthLoading />}><ProductSubmissionFormContent fixedType={fixedType} /></Suspense>;
 }
 
-function SubmitPageContent({ fixedType }: { fixedType: SubmitType }) {
+function ProductSubmissionFormContent({ fixedType }: { fixedType?: SubmitType }) {
+  const { user, loading, sessionEpoch } = useAuth();
+  const searchParams = useSearchParams();
+  const queryType = searchParams.get("type") === "idea" ? "idea" : "product";
+  const type = fixedType ?? queryType;
+  return <SubmitPageForUser key={`${user?.id ?? "anonymous"}:${sessionEpoch}:${type}`} fixedType={type} loading={loading} />;
+}
+
+function SubmitPageForUser({ fixedType, loading }: { fixedType: SubmitType; loading: boolean }) {
   const t = useTranslations("submit");
   const tc = useTranslations("common");
-  const tn = useTranslations("nav");
-  const { user, loading } = useAuth();
-  const draftStorageKey = user ? `${DRAFT_STORAGE_KEY}:${user.id}` : null;
+  const { user } = useAuth();
   const locale = useLocale();
+  const router = useRouter();
+  const signInHref = getSignInHref(fixedType === "idea" ? "/submit/idea" : "/submit/product", locale);
+  useEffect(() => { if (!loading && !user) router.replace(signInHref); }, [loading, user, router, signInHref]);
+  const draftStorageKey = user ? `${DRAFT_STORAGE_KEY}:${user.id}` : null;
 
   const [drafts, setDrafts] = useState<Record<SubmitType, Draft>>({ product: emptyDraft(), idea: emptyDraft() });
-  const type = fixedType;
-  const signInHref = getSignInHref(`/submit?type=${type}`, locale);
+  const [type, setType] = useState<SubmitType>(fixedType);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [published, setPublished] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
-
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -120,8 +128,7 @@ function SubmitPageContent({ fixedType }: { fixedType: SubmitType }) {
     setDrafts((prev) => ({ ...prev, [type]: { ...prev[type], ...patch } }));
   }
 
-  if (loading) return <AuthLoading />;
-  if (!user) return <div className="community-panel p-6"><Link href={signInHref} className="community-button">{tn("signIn")}</Link></div>;
+  if (loading || !user) return <AuthLoading />;
 
   if (submitted) {
     return (
@@ -208,12 +215,27 @@ function SubmitPageContent({ fixedType }: { fixedType: SubmitType }) {
   }
 
   return (
-    <div className="py-2">
+    <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
       <div className="max-w-3xl">
-        <h2 className="text-2xl font-extrabold text-ink">{t(isProduct ? "productTitle" : "ideaTitle")}</h2>
+        <h1 className="text-3xl font-extrabold text-ink">{t("title")}</h1>
         <p className="mt-2 text-muted">{t("subtitle", { name: user.name })}</p>
 
-
+        {!fixedType && <div className="mt-8 grid grid-cols-2 gap-4">
+          <TypeCard
+            icon="🚀"
+            title={t("productTitle")}
+            desc={t("productDesc")}
+            active={type === "product"}
+            onClick={() => setType("product")}
+          />
+          <TypeCard
+            icon="💡"
+            title={t("ideaTitle")}
+            desc={t("ideaDesc")}
+            active={type === "idea"}
+            onClick={() => setType("idea")}
+          />
+        </div>}
 
         <form className="mt-8 flex flex-col gap-5 rounded-2xl border border-line bg-surface p-6" onSubmit={handleSubmit}>
           <Field
@@ -363,6 +385,52 @@ function SubmitPageContent({ fixedType }: { fixedType: SubmitType }) {
   );
 }
 
+function TypeCard({
+  icon,
+  title,
+  desc,
+  active,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`relative flex items-start gap-3 rounded-2xl border-2 p-5 text-left transition-all ${
+        active
+          ? "border-brand bg-brand-soft shadow-[0_0_0_4px_var(--color-brand-soft)]"
+          : "border-line bg-surface hover:border-brand/50 hover:bg-surface-2"
+      }`}
+    >
+      <span
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl transition-colors ${
+          active ? "bg-brand text-white" : "bg-surface-2 text-ink"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-display text-base font-bold text-ink">{title}</span>
+        <span className="mt-0.5 block text-xs leading-snug text-muted">{desc}</span>
+      </span>
+      <span
+        className={`absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors ${
+          active ? "border-brand bg-brand text-white" : "border-line text-transparent"
+        }`}
+        aria-hidden
+      >
+        ✓
+      </span>
+    </button>
+  );
+}
 
 function Field({
   label,

@@ -20,6 +20,12 @@ export function SiteHeader() {
   const menuRef = useRef<HTMLDetailsElement>(null);
   const signInHref = getSignInHref(pathname || "/", locale);
   const sections = ["safety", "feedback", "discussion", "activities"] as const;
+  const currentSection = sections.find((section) => pathname === `/community/${section}` || pathname.startsWith(`/community/${section}/`));
+  const submitHref = currentSection === "feedback"
+    ? "/submit/feedback"
+    : currentSection
+      ? `/submit/post?section=${currentSection}`
+      : "/submit/post";
   const closeMenu = () => { if (menuRef.current) menuRef.current.open = false; };
 
   return (
@@ -33,7 +39,7 @@ export function SiteHeader() {
         </nav>
         <div className="fans-header-tools">
           <LanguageSwitcher />
-          <Link href="/submit" aria-label={t("submit")} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>
+          <Link href={submitHref} aria-label={t("submit")} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>
           <div className="fans-desktop-account">
             {loading ? <AuthLoading compact /> : user ? <><NotificationBell /><UserMenu name={user.name} avatarUrl={user.avatarUrl} isAdmin={isAdmin} onSignOut={signOut} /></> : <Link href={signInHref} className="fans-signin">{t("signIn")}</Link>}
           </div>

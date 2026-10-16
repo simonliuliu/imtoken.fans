@@ -1136,6 +1136,45 @@
     "closingTitle": "一个人的经验，可以帮到更多人。",
     "closingBody": "分享真实体验，尊重不同观点，一起让钱包用起来更安心、更顺手。"
   },
+  "communitySubmit": {
+    "feedbackVisibility": "反馈发布后将公开显示，管理员可整理或隐藏不当内容。",
+    "publishFeedback": "发布反馈",
+    "signInForFeedback": "登录并发布反馈",
+    "feedbackLength": "正文与补充信息：{count, number} / 5000 字",
+    "previewLabel": "演示预览",
+    "postTitle": "发布社区帖子",
+    "postIntro": "分享钱包经验、研究发现或市场观察，选择合适的社区板块开始交流。",
+    "feedbackTitle": "提交产品反馈",
+    "feedbackIntro": "描述你遇到的问题或希望改进的体验。首版表单区分问题反馈和优化建议。",
+    "typeNavigation": "选择提交内容",
+    "postType": "普通帖子",
+    "postTypeHelp": "安全故事、钱包经验、研究与讨论",
+    "feedbackType": "产品反馈",
+    "feedbackTypeHelp": "提交 Bug 或产品优化建议",
+    "productType": "提交社区产品",
+    "productTypeHelp": "展示已经制作的产品或作品",
+    "postBoundary": "当前页面仅供界面预览；示例内容不会发布、保存或增加成长值。",
+    "feedbackBoundary": "当前页面仅供界面预览；反馈不会提交或保存。附件上传将在真实反馈功能中接入。",
+    "feedbackKindLabel": "反馈类型",
+    "bugType": "问题反馈",
+    "bugTypeHelp": "记录异常现象与复现条件，方便定位问题。",
+    "suggestionType": "优化建议",
+    "suggestionTypeHelp": "说明使用场景、改进方向和带来的帮助。",
+    "fields": {
+      "section": "发布到板块", "category": "帖子分类", "module": "涉及的产品模块", "title": "标题", "body": "正文", "problem": "问题描述", "situation": "使用场景与当前体验", "appVersion": "imToken 版本 / 浏览器版本", "device": "设备或平台", "steps": "复现步骤", "expected": "预期表现", "actual": "实际表现", "scenario": "使用场景", "proposal": "建议的改进方式", "impact": "这项改进能带来什么帮助", "attachments": "图片或视频"
+    },
+    "placeholders": {
+      "module": "例如：转账、资产、DApp 浏览器", "appVersion": "例如：2.18.0", "steps": "1. 打开…… 2. 点击…… 3. 观察到……", "scenario": "你在什么情况下使用这个功能？", "proposal": "你希望它如何改进？", "impact": "哪些用户会因此受益？"
+    },
+    "deviceOptions": { "ios": "iOS", "android": "Android", "browserExtension": "浏览器扩展", "other": "其他" },
+    "chooseOne": "请选择",
+    "uploadDeferred": "当前表单尚未接入图片与视频文件上传；请勿在截图或视频中展示钱包敏感信息。",
+    "privacyTitle": "分享前保护钱包安全",
+    "privacyBody": "请遮挡助记词、私钥、密码、完整地址和交易截图中的敏感信息。社区不会要求你公开这些内容。",
+    "previewSubmit": "预览内容", "editPreview": "继续编辑", "startOver": "重新填写", "previewCreated": "已生成本页预览，尚未发布或保存。", "resetNotice": "表单已清空；内容仍未发布或保存。",
+    "titlePlaceholderPost": "例如：我对硬件钱包连接流程的观察", "titlePlaceholderFeedback": "用一句话概括问题或建议", "bodyPlaceholder": "说明背景、你的观察和希望交流的问题。请使用虚构示例并保护钱包敏感信息。", "bugDescriptionPlaceholder": "描述遇到的异常，以及它对你造成的影响。", "suggestionDescriptionPlaceholder": "说明目前哪里不顺手，以及你希望改善什么。",
+    "descriptionTooLong": "完整反馈共 {count} 字，最多 5000 字。"
+  },
   "community": {
     "demoCommunity": "演示社区",
     "demoNotice": "内容与互动均为示例，不写入真实账号。",
@@ -1442,7 +1481,16 @@
     "slidePosition": "第 {index} / {count} 张",
     "refreshPopular": "换一批",
     "contentTypeField": "内容类型",
-    "localInteraction": "已更新，仅当前页面有效"
+    "localInteraction": "已更新，仅当前页面有效",
+    "commentDemoBoundary": "以下作者与评论均为虚拟示例；本页操作只在当前页面显示。",
+    "upvoteCount": "赞同 ({count})",
+    "expandRepliesCount": "展开 {count} 条回复",
+    "collapseRepliesCount": "收起 {count} 条回复",
+    "report": "举报",
+    "share": "分享",
+    "demoReportDisabled": "示例评论不支持举报。",
+    "commentLinkCopied": "评论链接已复制",
+    "commentLinkFailed": "暂时无法复制链接"
   },
   "tokenPersonas": {
     "visitPersona": "前往数字币人社区：{name}",

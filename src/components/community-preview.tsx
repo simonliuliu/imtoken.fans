@@ -1,5 +1,6 @@
 "use client";
 
+import { CommentToolbarIcon } from "@/components/comment-toolbar-icon";
 import Image from "next/image";
 import { FEEDBACK_CHANGED } from "@/lib/feedback";
 import { CoCreationFeedContext } from "@/components/co-creation-feed-context";
@@ -116,24 +117,39 @@ export function CommunityBoard({ section, productsContent, initialCategory, init
 
 function DemoComments({ post, onCountChange }: { post: DemoPost; onCountChange: (count: number) => void }) {
   const t = useTranslations("community");
+  const format = useFormatter();
   const [comments, setComments] = useState<DemoComment[]>(() => demoSeedComments(post));
   const [body, setBody] = useState("");
-  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [sort, setSort] = useState<"popular" | "latest">("popular");
   const [liked, setLiked] = useState<string[]>([]);
+  const [collapsed, setCollapsed] = useState<string[]>([]);
   const [announcement, setAnnouncement] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
   function submit(event: FormEvent) {
     event.preventDefault(); if (!body.trim()) return;
-    setComments((previous) => [...previous, { id: `local-${previous.length}`, body: body.trim(), author: "you", level: 2, likes: 0, order: previous.length + 1, parent: replyTo ?? undefined, local: true }]);
+    const rootId = replyTarget ? (comments.find((comment) => comment.id === replyTarget)?.parent ?? replyTarget) : undefined;
+    setComments((previous) => [...previous, { id: `local-${previous.length}`, body: body.trim(), author: "you", level: 2, likes: 0, order: previous.length + 1, parent: rootId, local: true }]);
     onCountChange(comments.length + 1);
-    setBody(""); setReplyTo(null); setAnnouncement(t("commentAdded"));
+    if (rootId) setCollapsed((previous) => previous.filter((id) => id !== rootId));
+    setBody(""); setReplyTarget(null); setAnnouncement(t("commentAdded"));
   }
   function toggleLike(id: string) { setLiked((previous) => previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]); setAnnouncement(t("localInteraction")); }
-  function renderComment(comment: DemoComment, reply = false) {
-    return <div className={`community-comment ${reply ? "community-comment-reply" : ""}`} key={comment.id}><Avatar name={t(`authors.${comment.author}`)} className={`community-avatar community-avatar-${comment.author}`} /><div className="community-comment-content"><div className="community-comment-author"><strong>{t(`authors.${comment.author}`)}</strong><LevelBadge level={comment.level} size="xs" showIcon={false} />{comment.local && <span>{t("justNow")}</span>}</div><p>{comment.local ? comment.body : t(`comments.${comment.body}`)}</p><div className="community-comment-actions"><button type="button" aria-pressed={liked.includes(comment.id)} onClick={() => toggleLike(comment.id)}>{liked.includes(comment.id) ? "♥" : "♡"} {t("likeCount", { count: comment.likes + Number(liked.includes(comment.id)) })}</button><button type="button" onClick={() => { setReplyTo(comment.parent ?? comment.id); input.current?.focus(); }}>{t("reply")}</button></div>{!reply && comments.filter((item) => item.parent === comment.id).map((item) => renderComment(item, true))}</div></div>;
+  const roots = comments.filter((comment) => !comment.parent);
+  const repliesByRoot = new Map(roots.map((root) => [root.id, comments.filter((comment) => comment.parent === root.id).sort((a, b) => a.order - b.order)]));
+  function shareComment(id: string) {
+    const target = new URL(`${window.location.pathname}#comment-${id}`, window.location.origin);
+    if (target.protocol !== "http:" && target.protocol !== "https:") {
+      setAnnouncement(t("commentLinkFailed"));
+      return;
+    }
+    void navigator.clipboard?.writeText(target.toString()).then(() => setAnnouncement(t("commentLinkCopied")), () => setAnnouncement(t("commentLinkFailed")));
   }
-  return <section className="community-panel community-comments" id="comments"><div className="community-panel-heading"><h2>{t("commentsTitle", { count: comments.length })}</h2><div className="community-comment-sort"><button type="button" aria-pressed={sort === "popular"} onClick={() => setSort("popular")}>{t("sort.popular")}</button><button type="button" aria-pressed={sort === "latest"} onClick={() => setSort("latest")}>{t("sort.latest")}</button></div></div><form onSubmit={submit}>{replyTo && <div className="community-reply-target">{t("replyingTo", { name: t(`authors.${comments.find((comment) => comment.id === replyTo)?.author ?? "you"}`) })}<button type="button" onClick={() => setReplyTo(null)}>{t("cancelReply")}</button></div>}<label className="sr-only" htmlFor="demo-comment-body">{t("commentPlaceholder")}</label><textarea id="demo-comment-body" ref={input} maxLength={1000} rows={3} value={body} onChange={(event) => setBody(event.target.value)} placeholder={t("commentPlaceholder")} /><div className="community-comment-submit"><button type="submit" className="community-button" disabled={!body.trim()}>{replyTo ? t("addReply") : t("addComment")}</button></div></form>{announcement && <p className="community-local-status" role="status">{announcement}</p>}<div className="community-comment-list">{comments.filter((comment) => !comment.parent).sort((a, b) => sort === "latest" ? b.order - a.order : (b.likes + Number(liked.includes(b.id))) - (a.likes + Number(liked.includes(a.id)))).map((comment) => renderComment(comment))}</div></section>;
+  function renderComment(comment: DemoComment, reply = false) {
+    const createdAt = new Date(new Date(post.createdAt).getTime() - Math.max(0, post.commentCount - comment.order) * 17 * 60_000);
+    return <div className={`community-comment ${reply ? "community-comment-reply" : ""}`} key={comment.id} id={`comment-${comment.id}`}><Avatar name={t(`authors.${comment.author}`)} className={`community-avatar community-avatar-${comment.author}`} /><div className="community-comment-content"><div className="community-comment-author"><strong>{t(`authors.${comment.author}`)}</strong><LevelBadge level={comment.level} size="xs" showIcon={false} />{comment.local && <span>{t("justNow")}</span>}</div><p>{comment.local ? comment.body : t(`comments.${comment.body}`)}</p><div className="community-comment-actions"><button type="button" aria-pressed={liked.includes(comment.id)} onClick={() => toggleLike(comment.id)}><CommentToolbarIcon name="upvote" /> {t("upvoteCount", { count: comment.likes + Number(liked.includes(comment.id)) })}</button><button type="button" onClick={() => { setReplyTarget(comment.id); setBody(`@${t(`authors.${comment.author}`)} `); input.current?.focus(); }}><CommentToolbarIcon name="reply" />{t("reply")}</button><button type="button" disabled title={t("demoReportDisabled")}><CommentToolbarIcon name="report" />{t("report")}</button><button type="button" onClick={() => shareComment(comment.id)}><CommentToolbarIcon name="share" />{t("share")}</button><time dateTime={comment.local ? undefined : createdAt.toISOString()}><CommentToolbarIcon name="clock" />{comment.local ? t("justNow") : format.dateTime(createdAt, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" })}</time></div></div></div>;
+  }
+  return <section className="community-panel community-comments" id="comments"><div className="community-panel-heading"><h2>{t("commentsTitle", { count: comments.length })}</h2><div className="community-comment-sort"><button type="button" aria-pressed={sort === "popular"} onClick={() => setSort("popular")}>{t("sort.popular")}</button><button type="button" aria-pressed={sort === "latest"} onClick={() => setSort("latest")}>{t("sort.latest")}</button></div></div><p className="community-comment-demo-note">{t("commentDemoBoundary")}</p><form onSubmit={submit}>{replyTarget && <div className="community-reply-target">{t("replyingTo", { name: t(`authors.${comments.find((comment) => comment.id === replyTarget)?.author ?? "you"}`) })}<button type="button" onClick={() => setReplyTarget(null)}>{t("cancelReply")}</button></div>}<label className="sr-only" htmlFor="demo-comment-body">{t("commentPlaceholder")}</label><textarea id="demo-comment-body" ref={input} maxLength={1000} rows={3} value={body} onChange={(event) => setBody(event.target.value)} placeholder={t("commentPlaceholder")} /><div className="community-comment-submit"><button type="submit" className="community-button" disabled={!body.trim()}>{replyTarget ? t("addReply") : t("addComment")}</button></div></form>{announcement && <p className="community-local-status" role="status">{announcement}</p>}<div className="community-comment-list">{roots.sort((a, b) => sort === "latest" ? b.order - a.order : (b.likes + Number(liked.includes(b.id))) - (a.likes + Number(liked.includes(a.id)))).map((comment) => { const replies = repliesByRoot.get(comment.id) ?? []; const isCollapsed = collapsed.includes(comment.id); return <div className="community-comment-thread" key={comment.id}>{renderComment(comment)}{replies.length > 0 && <><button type="button" className="community-thread-toggle" aria-expanded={!isCollapsed} onClick={() => setCollapsed((previous) => isCollapsed ? previous.filter((id) => id !== comment.id) : [...previous, comment.id])}>{isCollapsed ? t("expandRepliesCount", { count: replies.length }) : t("collapseRepliesCount", { count: replies.length })}</button>{!isCollapsed && <div className="community-comment-replies">{replies.map((reply) => renderComment(reply, true))}</div>}</>}</div>; })}</div></section>;
 }
 
 export function CommunityPost({ post }: { post: DemoPost }) {
