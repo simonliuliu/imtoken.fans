@@ -221,3 +221,8 @@ PR #1–#4 已汇入 `codex/community-integration`（整合提交 `a3d0122`；20
 ### 本批上线结果更新
 
 PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品限制/0028关注通知已受控执行，历史内容、互动、9条消息和2条真实反馈保留；真实登录会话通知只读与新版发布页检查通过，旧idea投稿跳转产品页。真实多账号收发、并发、视频/附件、普通论坛持久化及视觉review继续保留。详见 [本批记录](docs/tasks/pr18-22-integration.md)；收尾PR仅同步进度，不改变业务代码。
+
+
+## 2026-10-16 反馈Review三项修复
+
+在独立`codex/feedback-review-fixes`修复持续草稿/查重回跳、未确认提交固定快照与UUID重试、新增0029数据库JS空白校验。当前表单26项、SQL28项、独立QA额外6项及旧Composer12项通过；1548键i18n、lint、生产Webpack构建与中英桌面/390px、本地虚拟账号登录续写及模拟已保存响应失败→原编号重试无重复通过。正式站与目标库尚未激活0029，不标线上完成；图片/视频明确留下一阶段。见[任务](docs/tasks/feedback-review-fixes.md)及[Review](docs/reviews/feedback-review-fixes.md)，交用户查看本地效果。
