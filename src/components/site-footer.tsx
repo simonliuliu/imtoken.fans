@@ -10,6 +10,8 @@ export async function SiteFooter() {
         <div className="fans-footer-top">
           <div><Link href="/" className="fans-brand"><BrandLogo /></Link><p>{t("description")}</p></div>
           <nav aria-label={t("navigation")}>
+            <Link href="/about">{t("about")}</Link>
+            <Link href="/how-it-works">{t("howItWorks")}</Link>
             <Link href="/community-guidelines">{t("guidelines")}</Link>
             <Link href="/faq">{t("faq")}</Link>
           </nav>

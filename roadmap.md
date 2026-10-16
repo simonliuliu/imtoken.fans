@@ -54,7 +54,7 @@
 - [x] 首页 AI 产品/点子归入共创入口；保留旧页面，未实现路径准确说明。
 - [x] 安装锁定依赖、阅读本地 Next.js 指南；首页 i18n/lint/build 与中英移动端预览验证。
 
-M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS Code 与固定端口配置。剩余品牌说明页、图标/分享图及全站一致性另拆下一批；不能把 M1-A 等同完整 M1。见 [本批 review](docs/reviews/M1-A-home.md)。
+M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS Code 与固定端口配置。品牌说明页、图标/分享图及全站一致性在 [M1-B](docs/tasks/M1-B-brand-consistency.md)继续；不能把 M1-A 等同完整 M1。见 [本批 review](docs/reviews/M1-A-home.md)。
 
 用户review：旧首页重复、窄、介绍过多，要求参考小米社区，能进入四板块看虚拟帖子。[M1-A2任务](docs/tasks/M1-A2-community-preview.md)已交付流体首页、板块/详情、12篇双语演示帖和本地互动，等待review；不以演示替代M2真实模型。
 

@@ -12,7 +12,7 @@ export function CommunityOrbit() {
       <div className="orbit-ring orbit-ring-two absolute inset-[21%] rounded-full border border-dashed border-white/40" aria-hidden />
       <div className="orbit-center absolute left-1/2 top-1/2 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-[2.2rem] border border-white/90 bg-white/80 text-center shadow-2xl shadow-blue-900/10 backdrop-blur-xl sm:h-36 sm:w-36">
         <span className="text-2xl">✦</span>
-        <strong className="mt-2 font-display text-lg text-ink">imAihunt</strong>
+        <strong className="mt-2 font-display text-lg text-ink">imToken Fans</strong>
         <span className="mt-1 px-3 text-[11px] font-semibold leading-4 text-brand-ink">{t("orbitCenter")}</span>
       </div>
       <OrbitCard className="left-[0%] top-[16%]" emoji="🧠" label={t("orbitIdea")} tone="blue" />
