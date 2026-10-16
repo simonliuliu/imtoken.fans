@@ -244,3 +244,7 @@ PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品�
 ## 2026-10-16 Dangerous 安全标记排查
 
 Google公开报告已确认 imtoken-fans.vercel.app 为 unsafe，类别是诱导提供个人信息或下载软件。独立代码审计未发现盗取/注入路径，生产依赖audit0；这不等于误报。已准备钱包品牌/图标修正、社区凭证边界提示和Search Console所有权验证文件，i18n1541键、lint、build与本地静态路径检查通过。尚未解除；待所有者合并发布后验证所有权、读取具体受影响URL并完成修复/复审，见[任务记录](docs/tasks/site-dangerous-investigation.md)。
+
+### 全部PR合并追加
+
+PR25经集成PR29已合入；PR27追加的发布流程与PR30安全验证准备继续整合。反馈不可变请求保护保留，Google告警解除仍待Search Console核实/复审；0031数据库校验尚待安全操作窗口。详见[本次记录](docs/tasks/pr25-27-integration.md)。
