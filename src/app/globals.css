@@ -1377,3 +1377,14 @@ html {
 }
 
 .token-personas-grid > a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+/* One publishing page; content types keep their own business form. */
+.publish-shell { max-width: 860px; margin: 0 auto; padding: 0 20px 48px; }
+.publish-category { display: flex; flex-direction: column; gap: 8px; margin: 24px 0; font-size: 14px; font-weight: 600; }
+.publish-category select { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink); }
+.publish-form { overflow: hidden; }
+.publish-form .community-dialog-content { padding: 24px; }
+.publish-form { padding: 0; }
+.publish-form label { display: block; margin-top: 18px; font-size: 13px; font-weight: 500; }
+.publish-form :is(input, textarea, select) { display: block; width: 100%; margin-top: 9px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfc; padding: 12px 14px; font-size: 14px; line-height: 1.8; resize: vertical; color: var(--ink); }
+.publish-form form > button { margin-top: 24px; }

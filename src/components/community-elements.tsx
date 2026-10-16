@@ -25,7 +25,7 @@ export function ComposeDemoButton(props: { section?: CommunitySection; compact?:
   if (loading) return <button type="button" disabled className="community-button" aria-label={t("compose")}>{t("compose")}</button>;
   return <Composer key={`${user?.id ?? "anonymous"}:${sessionEpoch}`} {...props} owner={user?.id ?? null} />;
 }
-function Composer({ section = "discussion", compact = false, owner }: { section?: CommunitySection; compact?: boolean; owner: string | null }) {
+export function Composer({ section = "discussion", compact = false, owner, pageMode }: { section?: CommunitySection; compact?: boolean; owner: string | null; pageMode?: "post" | "feedback" }) {
   const t = useTranslations("community");
   const f = useTranslations("feedbackLive");
   const c = useTranslations("cooperation");
@@ -36,8 +36,8 @@ function Composer({ section = "discussion", compact = false, owner }: { section?
   const requestId = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const [board, setBoard] = useState<CommunitySection>(section);
-  const [category, setCategory] = useState(SECTION_CATEGORIES[section].find((value) => value !== "announcements" && value !== "changelog")!);
+  const [board, setBoard] = useState<CommunitySection>(pageMode === "feedback" ? "feedback" : section);
+  const [category, setCategory] = useState(SECTION_CATEGORIES[pageMode === "feedback" ? "feedback" : section].find((value) => value !== "announcements" && value !== "changelog")!);
   const [module, setModule] = useState<FeedbackModule>("wallet");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -49,7 +49,7 @@ function Composer({ section = "discussion", compact = false, owner }: { section?
   const [similarError, setSimilarError] = useState("");
   const realFeedback = board === "feedback" && category === "wallet";
   useEffect(() => {
-    if (!compact) return;
+    if (!compact && pageMode !== "feedback") return;
     const open = () => { setBoard("feedback"); setCategory("wallet"); setPreview(false); setError(""); dialog.current?.showModal(); };
     window.addEventListener(FEEDBACK_COMPOSE, open);
     if (owner && new URLSearchParams(window.location.search).get("composeFeedback") === "1") {
@@ -62,7 +62,7 @@ function Composer({ section = "discussion", compact = false, owner }: { section?
       return () => { clearTimeout(timer); window.removeEventListener(FEEDBACK_COMPOSE, open); };
     }
     return () => window.removeEventListener(FEEDBACK_COMPOSE, open);
-  }, [compact, f, owner]);
+  }, [compact, pageMode, f, owner]);
   useEffect(() => {
     let stale = false;
     if (!realFeedback || title.trim().length < 2) return;
@@ -89,15 +89,14 @@ function Composer({ section = "discussion", compact = false, owner }: { section?
       router.push(`/community/feedback?category=wallet&idea=${result.data.id}`);
     } catch { setError(f("unexpected")); } finally { setPending(false); }
   }
-  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent("/community/feedback?category=wallet&composeFeedback=1")}`;
-  return <><button ref={trigger} aria-label={t("compose")} className={`community-button ${compact ? "community-compose-compact" : ""}`} type="button" onClick={() => { setPreview(false); setError(""); setSignIn(false); dialog.current?.showModal(); }}>{t("compose")}<span aria-hidden>＋</span></button>
-    <dialog ref={dialog} onCancel={(event) => { if (pending) event.preventDefault(); }} aria-labelledby={dialogTitle} className="community-compose-dialog" onClose={() => trigger.current?.focus()} onClick={(event) => { if (event.target === dialog.current && !pending) dialog.current?.close(); }}><div className="community-dialog-content"><div className="community-dialog-heading"><h2 id={dialogTitle}>{realFeedback ? f("composeTitle") : t("composeTitle")}</h2><button type="button" className="community-icon-button" aria-label={realFeedback ? f("close") : t("close")} disabled={pending} onClick={() => dialog.current?.close()}>×</button></div>
+  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent("/submit?type=feedback&composeFeedback=1")}`;
+  const content = <div className="community-dialog-content"><div className="community-dialog-heading"><h2 id={dialogTitle}>{realFeedback ? f("composeTitle") : t("composeTitle")}</h2>{!pageMode && <button type="button" className="community-icon-button" aria-label={realFeedback ? f("close") : t("close")} disabled={pending} onClick={() => dialog.current?.close()}>×</button>}</div>
       <p className="community-compose-notice">{realFeedback ? f("publishNotice") : t("composeNotice")}</p>
       {error && <p role="alert">{error}</p>}
       {signIn && <Link href={signInHref} onClick={() => { try { saveFeedbackDraft("idea", owner, { title, body, module, requestId: requestId.current }); } catch { setError(f("draftUnavailable")); } }}>{f("signInContinue")}</Link>}
       {preview ? <div className="community-preview-result" role="status"><span className="community-demo-label">{t("previewOnly")}</span><p className="community-preview-category">{t(`sections.${board}.name`)} › {t(`categories.${category}`)}</p><h3>{title}</h3><p className="community-preview-body">{body}</p><button type="button" className="community-button community-button-outline" onClick={() => setPreview(false)}>{t("editPreview")}</button></div> : <form onSubmit={submit}>
-        <label>{t("boardField")}<select disabled={pending} value={board} onChange={(event) => { const value = event.target.value as CommunitySection; setBoard(value); setCategory(SECTION_CATEGORIES[value].find((item) => item !== "announcements" && item !== "changelog")!); setError(""); setSignIn(false); }}>{COMMUNITY_SECTIONS.map((value) => <option key={value} value={value}>{t(`sections.${value}.name`)}</option>)}</select></label>
-        <label>{t("contentTypeField")}<select disabled={pending} value={category} onChange={(event) => { setCategory(event.target.value); setError(""); setSignIn(false); }}>{SECTION_CATEGORIES[board].filter((value) => value !== "changelog" && value !== "announcements").map((value) => <option key={value} value={value}>{t(`categories.${value}`)}</option>)}</select></label>
+        {pageMode !== "feedback" && <><label>{t("boardField")}<select disabled={pending} value={board} onChange={(event) => { const value = event.target.value as CommunitySection; setBoard(value); setCategory(SECTION_CATEGORIES[value].find((item) => item !== "announcements" && item !== "changelog")!); setError(""); setSignIn(false); }}>{COMMUNITY_SECTIONS.filter((value) => !pageMode || value !== "feedback").map((value) => <option key={value} value={value}>{t(`sections.${value}.name`)}</option>)}</select></label>
+        <label>{t("contentTypeField")}<select disabled={pending} value={category} onChange={(event) => { setCategory(event.target.value); setError(""); setSignIn(false); }}>{SECTION_CATEGORIES[board].filter((value) => value !== "changelog" && value !== "announcements").map((value) => <option key={value} value={value}>{t(`categories.${value}`)}</option>)}</select></label></>}
         {realFeedback && <label>{c("moduleLabel")}<select disabled={pending} value={module} onChange={(event) => setModule(event.target.value as FeedbackModule)}>{FEEDBACK_MODULES.map((value) => <option key={value} value={value}>{c(`modules.${value}`)}</option>)}</select></label>}
         <label>{realFeedback ? f("titleField") : t("titleField")}<input required minLength={2} maxLength={realFeedback ? 120 : 60} disabled={pending} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("titlePlaceholder")} /></label>
         {realFeedback && title.trim().length >= 2 && <section aria-label={c("similarHeading")}><h3>{c("similarHeading")}</h3><p>{f("similarHelp")}</p>{similarError ? <p role="status">{similarError}</p> : similar.length ? similar.map((idea) => <p key={idea.id}><Link href={`/community/feedback?category=wallet&idea=${idea.id}`} onClick={() => { dialog.current?.close(); window.dispatchEvent(new CustomEvent(FEEDBACK_CHANGED, { detail: { id: idea.id } })); }}>{idea.title}</Link></p>) : <p>{f("noSimilar")}</p>}</section>}
@@ -105,5 +104,8 @@ function Composer({ section = "discussion", compact = false, owner }: { section?
         {realFeedback && <p className="community-compose-notice">{f("safety")}</p>}
         <button type="submit" disabled={pending || title.trim().length < 2 || body.trim().length < 2} className="community-button">{pending ? f("saving") : realFeedback ? f("publish") : t("previewCta")}<span aria-hidden>↗</span></button>
       </form>}
-    </div></dialog></>;
+    </div>;
+  if (pageMode) return <section className="community-panel publish-form">{content}</section>;
+  return <><button ref={trigger} aria-label={t("compose")} className={`community-button ${compact ? "community-compose-compact" : ""}`} type="button" onClick={() => { setPreview(false); setError(""); setSignIn(false); dialog.current?.showModal(); }}>{t("compose")}<span aria-hidden>＋</span></button>
+    <dialog ref={dialog} onCancel={(event) => { if (pending) event.preventDefault(); }} aria-labelledby={dialogTitle} className="community-compose-dialog" onClose={() => trigger.current?.focus()} onClick={(event) => { if (event.target === dialog.current && !pending) dialog.current?.close(); }}>{content}</dialog></>;
 }

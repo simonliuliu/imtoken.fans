@@ -22,7 +22,7 @@
     "about": "About",
     "leaderboard": "Leaderboard",
     "activities": "Activities",
-    "submit": "Submit",
+    "submit": "Publish",
     "signIn": "Sign in",
     "accountMenu": "Account menu",
     "profile": "Profile",
@@ -384,7 +384,9 @@
     "ratingMetric": "Rating",
     "supportMetric": "Support",
     "ratingCount": "{count} ratings",
-    "commentCount": "{count} comments"
+    "commentCount": "{count} comments",
+    "recommendedEmptyTitle": "No recommended products yet",
+    "recommendedEmptyBody": "Switch to Latest or Popular to browse community products."
   },
   "productRating": {
     "supportEyebrow": "Community support",
@@ -1495,7 +1497,7 @@
     "descriptionLabel": "Description",
     "titlePlaceholder": "What would you like to improve?",
     "descriptionPlaceholder": "Describe your situation, the problem, and the experience you would like.",
-    "similarHeading": "Possibly similar IDEAs",
+    "similarHeading": "Similar feedback may already exist",
     "keywordOnly": "Title keyword matches for reference. This is not AI analysis.",
     "noSimilar": "No matching examples yet. You can continue submitting.",
     "safety": "Never include recovery phrases, private keys or passwords. Image and video file uploads are planned for the real version; this prototype does not upload attachments.",
@@ -1514,7 +1516,7 @@
     "allStates": "All statuses",
     "sortLabel": "Sort by",
     "resultCount": "{count, plural, one {# IDEA} other {# IDEAs}} · Fictional examples",
-    "empty": "No matching IDEAs",
+    "empty": "No matching feedback yet",
     "emptyHint": "Try a different keyword or clear the filters.",
     "clearFilters": "Clear filters",
     "emptyColumn": "No examples yet",
@@ -1630,13 +1632,13 @@
     "sessionChanged": "Your session changed. Wait for it to refresh, then reload the feedback.",
     "close": "Close post form",
     "allEntry": "Read real product feedback, support and discussion from the community.",
-    "heading": "Product feedback · IDEAs",
+    "heading": "Product feedback",
     "intro": "Share real needs, vote and discuss. Statuses are organized by community admins and do not represent official release commitments.",
-    "publish": "Publish IDEA",
+    "publish": "Publish feedback",
     "composeTitle": "Publish product feedback",
     "titleField": "Title (2–120 characters)",
     "bodyField": "Description (2–5,000 characters)",
-    "publishNotice": "Product Cooperation → Product feedback publishes and saves a real post. Other content types remain previews. Feedback is public; admins may organize or hide inappropriate content.",
+    "publishNotice": "Feedback is public. Administrators may organize or hide inappropriate content.",
     "safety": "Never include recovery phrases, private keys, passwords or other sensitive information. Attachments are not available in this batch.",
     "saving": "Saving…",
     "saved": "Saved to the server.",
@@ -1673,7 +1675,7 @@
     "pageCount": "Page {page} of {pages}",
     "commentPage": "Comments {start}–{end} of {count}",
     "resultCount": "{count} IDEAs",
-    "emptyHint": "No real feedback matches yet. Clear your filters or publish the first IDEA.",
+    "emptyHint": "No feedback matches this view.",
     "progressNotice": "Shows real feedback from the current page. Votes do not directly set priority; community statuses are not official commitments.",
     "emptyColumn": "No feedback on this page"
   },
@@ -1689,5 +1691,13 @@
     "not_found": "This IDEA or comment does not exist or is not currently visible.",
     "parent": "The comment is unavailable or no longer belongs to this IDEA. Choose a reply target again.",
     "merge_blocked": "This IDEA already participates in a merge. Undo that merge first; chained merges are not supported."
+  },
+  "publishPage": {
+    "title": "Publish",
+    "category": "Content category",
+    "post": "Community post",
+    "feedback": "Product feedback",
+    "product": "Community product",
+    "idea": "Product idea (legacy)"
   }
 }
