@@ -14,13 +14,14 @@ async function signIn(page: Page) {
   await page.getByRole("button", { name: /^(Sign in|登录)$/ }).click();
 }
 
-test("游客进入英文投稿后使用社区登录，并返回原类型", async ({ page }) => {
+test("游客从旧点子链接进入社区登录后，只能提交产品", async ({ page }) => {
   await page.goto("/en/submit?type=idea");
   await expect(page).toHaveURL(/\/en\/auth\/sign-in\?/);
-  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/en/submit?type=idea");
+  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/en/submit?type=product");
   await signIn(page);
-  await expect(page).toHaveURL(/\/en\/submit\?type=idea$/);
-  await expect(page.getByRole("button", { name: /idea/i, pressed: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/en\/submit\?type=product$/);
+  await expect(page.getByRole("heading", { name: "Submit a product", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Submit an idea/i })).toHaveCount(0);
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
 });
 
@@ -35,7 +36,7 @@ test("已有社区会话，延迟加载期间不误显示登录或跳转", async
   await expect(page.locator('a[href*="auth/sign-in"]')).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe("/zh/submit");
   release();
-  await expect(page.getByRole("heading", { name: "提交社区产品或共创想法" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "提交产品", exact: true })).toBeVisible();
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
   await page.screenshot({ path: "test-results/auth-submit-desktop.png", fullPage: false });
 });

@@ -42,6 +42,7 @@ const server = createServer(async (request, response) => {
     return send(profileFor(id));
   }
   if (url.pathname === "/rest/v1/submission_cards") {
+    if (url.searchParams.get("type") === "eq.idea") return send([]);
     if (failProductList && !url.searchParams.has("id")) return send({ message: "Local test product list unavailable" }, 503);
     if (url.searchParams.get("id")?.startsWith("neq.")) return send([]);
     return send(url.searchParams.get("id")?.startsWith("eq.") ? product : [product]);

@@ -8,6 +8,7 @@ import { badgeInfo } from "@/lib/types";
 import { UserBadgeInline } from "@/components/user-badge-inline";
 import { LevelCard } from "@/components/level-progress";
 import { SubmissionListRow } from "@/components/submission-list-row";
+import { FollowControls } from "@/components/follow-controls";
 import { Avatar } from "@/components/avatar";
 
 // 极简公开主页：@提及点进来的落地页，只展示公开信息，没有编辑入口，
@@ -48,6 +49,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           {profile.bio && <p className="mt-1.5 max-w-md text-sm text-muted">{profile.bio}</p>}
         </div>
       </div>
+
+      <FollowControls targetId={profile.id} username={profile.username} />
 
       {/* 别人的主页只展示等级和经验总量，不显示进度条和"还差多少升级"。 */}
       <div className="mt-8">

@@ -7,17 +7,17 @@ import { isCommunitySection, SECTION_CATEGORIES } from "@/lib/community-demo";
 
 export default async function CommunityBoardPage({ params, searchParams }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ category?: string | string[]; idea?: string | string[] }>;
+  searchParams: Promise<{ category?: string | string[]; idea?: string | string[]; commentOffset?: string | string[] }>;
 }) {
   const { section } = await params;
   if (!isCommunitySection(section)) notFound();
-  const { category, idea } = await searchParams;
+  const { category, idea, commentOffset } = await searchParams;
   const initialCategory = typeof category === "string" && SECTION_CATEGORIES[section].includes(category) ? category : "all";
   const t = await getTranslations("community");
 
   return (
     <CommunityBoard
-      key={`${section}:${initialCategory}`}
+      key={`${section}:${initialCategory}:${typeof idea === "string" ? idea : ""}:${typeof commentOffset === "string" ? commentOffset : "0"}`}
       section={section}
       initialCategory={initialCategory}
       initialId={typeof idea === "string" ? idea : null}
