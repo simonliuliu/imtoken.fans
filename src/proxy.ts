@@ -27,6 +27,8 @@ function stripLocalePrefixFromAdmin(pathname: string): string | null {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Search Console retrieves its public ownership file without locale redirects or session refresh.
+  if (/^\/google[a-f0-9]{16}\.html$/.test(pathname)) return NextResponse.next();
   const unprefixedAdmin = stripLocalePrefixFromAdmin(pathname);
   if (unprefixedAdmin) {
     const url = request.nextUrl.clone();

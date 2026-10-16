@@ -241,3 +241,6 @@ PR #18–#23 全部 MERGED，正式 `bad9fd4` 已 READY。0026名称/0027产品�
 ### 普通帖提交入口与其他发布表单补充
 
 继续PR #27修复普通帖明确提交入口，检查产品/Bug建议反馈的校验、网络异常恢复、草稿和会话隔离。1567键中英/lint/build、15项隔离检查及独立QA通过；浏览器和发布状态、已知产品跨窗口并发限制单独记录于 [补充验收](docs/reviews/submission-flow-check.md)。主线旧预览尚未切换，不能把未合入界面称为线上已修复。
+## 2026-10-16 Dangerous 安全标记排查
+
+Google公开报告已确认 imtoken-fans.vercel.app 为 unsafe，类别是诱导提供个人信息或下载软件。独立代码审计未发现盗取/注入路径，生产依赖audit0；这不等于误报。已准备钱包品牌/图标修正、社区凭证边界提示和Search Console所有权验证文件，i18n1541键、lint、build与本地静态路径检查通过。尚未解除；待所有者合并发布后验证所有权、读取具体受影响URL并完成修复/复审，见[任务记录](docs/tasks/site-dangerous-investigation.md)。
