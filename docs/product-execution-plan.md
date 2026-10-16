@@ -126,3 +126,7 @@ production 已配置 6 项变量，Supabase 正式回调核验通过；0023/0024
 ## 本批品牌补齐
 
 全站品牌、参与说明、图标与分享图一并纳入本次集成，见 [M1-B 任务卡](tasks/M1-B-brand-consistency.md)。视觉 review 与真实业务验收分别记录。
+
+## 2026-10-16 原站交互继承
+
+已只读对照旧 imAihunt：真实评论、等级/XP、签到抽奖及后台外壳/权限未被重写，多个核心文件逐字节相同。当前差距是新四板块演示未复用原评论呈现和独立发布路径，而非缺失全部旧功能。按 [任务卡](tasks/legacy-community-experience.md)先做评论/发布 UX，再接真实帖子目标及后台/成长/活动规则；[盘点证据](reviews/legacy-community-code-audit.md)区分源码复用与运行时验收。

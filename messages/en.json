@@ -1134,6 +1134,45 @@
     "closingTitle": "One person’s experience can help many others.",
     "closingBody": "Share real experiences, respect different perspectives, and make everyday wallet use safer and easier, together."
   },
+  "communitySubmit": {
+    "feedbackVisibility": "Published feedback is public. Admins may organize or hide inappropriate content.",
+    "publishFeedback": "Publish feedback",
+    "signInForFeedback": "Sign in to publish feedback",
+    "feedbackLength": "Description and extra details: {count, number} / 5000 characters",
+    "previewLabel": "Preview only",
+    "postTitle": "Create a community post",
+    "postIntro": "Share wallet experience, research, or market observations in the right community section.",
+    "feedbackTitle": "Send product feedback",
+    "feedbackIntro": "Describe a problem or an experience you would like to improve. Choose a bug report or a product suggestion.",
+    "typeNavigation": "Choose what to submit",
+    "postType": "Community post",
+    "postTypeHelp": "Safety stories, wallet experience, research, and discussion",
+    "feedbackType": "Product feedback",
+    "feedbackTypeHelp": "Report a bug or suggest an improvement",
+    "productType": "Submit a community product",
+    "productTypeHelp": "Show a product or project you have built",
+    "postBoundary": "This page is an interface preview. Sample content is not published, saved, or rewarded with XP.",
+    "feedbackBoundary": "This page is an interface preview. Feedback is not submitted or saved. File uploads will be connected in the real feedback feature.",
+    "feedbackKindLabel": "Feedback type",
+    "bugType": "Bug report",
+    "bugTypeHelp": "Describe what went wrong and how to reproduce it.",
+    "suggestionType": "Product suggestion",
+    "suggestionTypeHelp": "Explain the situation, proposed improvement, and expected benefit.",
+    "fields": {
+      "section": "Community section", "category": "Post category", "module": "Product area", "title": "Title", "body": "Post body", "problem": "What went wrong", "situation": "Use case and current experience", "appVersion": "imToken / browser version", "device": "Device or platform", "steps": "Steps to reproduce", "expected": "Expected result", "actual": "What actually happened", "scenario": "Use case", "proposal": "Suggested improvement", "impact": "Who would benefit and how", "attachments": "Images or video"
+    },
+    "placeholders": {
+      "module": "For example: transfers, assets, or DApp browser", "appVersion": "For example: 2.18.0", "steps": "1. Open… 2. Select… 3. Observe…", "scenario": "When do you use this feature?", "proposal": "How would you improve it?", "impact": "Which people would benefit?"
+    },
+    "deviceOptions": { "ios": "iOS", "android": "Android", "browserExtension": "Browser extension", "other": "Other" },
+    "chooseOne": "Choose one",
+    "uploadDeferred": "Image and video file uploads are not available in this form yet. Do not expose sensitive wallet information in screenshots or videos.",
+    "privacyTitle": "Protect wallet security before sharing",
+    "privacyBody": "Hide recovery phrases, private keys, passwords, full addresses, and sensitive transaction details. The community will never ask you to publish them.",
+    "previewSubmit": "Preview post", "editPreview": "Keep editing", "startOver": "Start over", "previewCreated": "Preview created on this page. Nothing has been published or saved.", "resetNotice": "Form cleared. Nothing has been published or saved.",
+    "titlePlaceholderPost": "For example: Notes on the hardware wallet connection flow", "titlePlaceholderFeedback": "Summarize the problem or suggestion", "bodyPlaceholder": "Add context, what you observed, and what you want to discuss. Use fictional examples and protect sensitive wallet information.", "bugDescriptionPlaceholder": "Describe the unexpected behavior and how it affects you.", "suggestionDescriptionPlaceholder": "Describe what feels difficult today and what you would improve.",
+    "descriptionTooLong": "The complete feedback is {count} characters; the maximum is 5,000."
+  },
   "community": {
     "demoCommunity": "Community preview",
     "demoNotice": "Sample content and interactions. Nothing is saved to real accounts.",
@@ -1440,7 +1479,16 @@
     "slidePosition": "Slide {index} of {count}",
     "refreshPopular": "Refresh",
     "contentTypeField": "Content type",
-    "localInteraction": "Updated for this page only"
+    "localInteraction": "Updated for this page only",
+    "commentDemoBoundary": "Authors and comments below are fictional examples. Actions appear on this page only.",
+    "upvoteCount": "Upvote ({count})",
+    "expandRepliesCount": "Show {count} replies",
+    "collapseRepliesCount": "Hide {count} replies",
+    "report": "Report",
+    "share": "Share",
+    "demoReportDisabled": "Sample comments cannot be reported.",
+    "commentLinkCopied": "Comment link copied",
+    "commentLinkFailed": "Could not copy the link"
   },
   "tokenPersonas": {
     "visitPersona": "Visit the digital coin community: {name}",

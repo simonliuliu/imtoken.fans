@@ -26,7 +26,7 @@ export default async function IdeasPage() {
           <div className="rounded-2xl border border-dashed border-line bg-surface-2 p-8 text-center text-sm text-muted">
             {t.rich("empty", {
               submitLink: (chunks) => (
-                <Link href="/submit" className="font-medium text-brand-ink hover:underline">
+                <Link href="/submit/idea" className="font-medium text-brand-ink hover:underline">
                   {chunks}
                 </Link>
               ),
@@ -44,7 +44,7 @@ export default async function IdeasPage() {
           <p className="font-semibold text-ink">{t("ctaTitle")}</p>
           <p className="mt-1 text-sm text-muted">{t("ctaSubtitle")}</p>
           <Link
-            href="/submit"
+            href="/submit/idea"
             className="mt-4 inline-block rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-ink"
           >
             {t("ctaButton")}
