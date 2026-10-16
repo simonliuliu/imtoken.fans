@@ -2,11 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/profile";
-import { hasPermission } from "@/lib/admin-guard";
 import { isBlacklisted } from "@/lib/user-tags";
 import { normalizeTags } from "@/lib/tag-taxonomy";
 import { runModerationPipeline } from "@/lib/moderation/pipeline";
@@ -27,10 +26,8 @@ import type {
   TeamMember,
 } from "@/lib/types";
 
-const COOLDOWN_HOURS = 24;
-
 export interface CreateSubmissionInput {
-  type: "product" | "idea";
+  type: "product";
   title: string;
   tagline: string;
   description: string;
@@ -62,15 +59,17 @@ export async function createSubmission(
   input: CreateSubmissionInput
 ): Promise<{ error: string } | { submissionId: string; published: boolean }> {
   const t = await getTranslations("errors");
+  // Old clients and direct Server Action requests must not reopen idea submissions.
+  if (!input || input.type !== "product") return { error: t("productSubmissionsOnly") };
   const title = input.title.trim();
   const tagline = input.tagline.trim();
   const description = input.description.trim();
 
-  if (title.length < 2 || title.length > (input.type === "product" ? 60 : 100)) {
-    return { error: t(input.type === "product" ? "productTitleLength" : "titleLength") };
+  if (title.length < 2 || title.length > 60) {
+    return { error: t("productTitleLength") };
   }
-  if (tagline.length < 2 || tagline.length > (input.type === "product" ? 60 : 140)) {
-    return { error: t(input.type === "product" ? "productTaglineLength" : "taglineLength") };
+  if (tagline.length < 2 || tagline.length > 60) {
+    return { error: t("productTaglineLength") };
   }
   if (description.length < 10 || description.length > 5000) return { error: t("descriptionLength") };
 
@@ -123,32 +122,21 @@ export async function createSubmission(
   const makerNote = input.makerNote?.trim().slice(0, 1200) || null;
   const feedbackPrompt = input.feedbackPrompt?.trim().slice(0, 500) || null;
 
-  if (input.type === "product") {
-    if (!websiteUrl) return { error: t("productWebsiteRequired") };
-    if (!logoPath) return { error: t("productLogoRequired") };
-    if (screenshotPaths.length === 0) return { error: t("productScreenshotRequired") };
-    if (productPlatforms.length === 0) return { error: t("productPlatformRequired") };
-    if (!pricingType || !launchStage || !makerRelationship) return { error: t("productDetailsRequired") };
-  }
-
-  // 新的社区产品投稿走审核和重复检测，不沿用旧 imAihunt 对全部投稿统一施加的 24 小时冷却。
-  if (input.type === "idea" && profile.submissionCooldownUntil && new Date(profile.submissionCooldownUntil) > new Date()) {
-    return {
-      error: t("submitCooldown", {
-        until: new Date(profile.submissionCooldownUntil).toLocaleString(await getLocale()),
-      }),
-    };
-  }
+  if (!websiteUrl) return { error: t("productWebsiteRequired") };
+  if (!logoPath) return { error: t("productLogoRequired") };
+  if (screenshotPaths.length === 0) return { error: t("productScreenshotRequired") };
+  if (productPlatforms.length === 0) return { error: t("productPlatformRequired") };
+  if (!pricingType || !launchStage || !makerRelationship) return { error: t("productDetailsRequired") };
   if (await isBlacklisted(profile.id)) {
     return { error: t("blacklistedSubmit") };
   }
 
   const tags = normalizeTags(input.tags);
-  if (input.type === "product" && tags.length === 0) return { error: t("productTagRequired") };
+  if (tags.length === 0) return { error: t("productTagRequired") };
 
   const supabase = await createClient();
   const admin = createAdminClient();
-  if (input.type === "product" && websiteUrl) {
+  {
     // 待审核投稿对其他普通用户不可见，因此必须用服务端管理员客户端做全量重复检测。
     const { data: duplicate, error: duplicateError } = await admin
       .from("submissions")
@@ -168,7 +156,7 @@ export async function createSubmission(
   const { data: inserted, error } = await supabase
     .from("submissions")
     .insert({
-      type: input.type,
+      type: "product",
       title,
       tagline,
       description,
@@ -180,12 +168,12 @@ export async function createSubmission(
       screenshot_paths: screenshotPaths,
       team,
       social_links: socialLinks,
-      product_platforms: input.type === "product" ? productPlatforms : [],
-      pricing_type: input.type === "product" ? pricingType : null,
-      launch_stage: input.type === "product" ? launchStage : null,
-      maker_relationship: input.type === "product" ? makerRelationship : null,
-      maker_note: input.type === "product" ? makerNote : null,
-      feedback_prompt: input.type === "product" ? feedbackPrompt : null,
+      product_platforms: productPlatforms,
+      pricing_type: pricingType,
+      launch_stage: launchStage,
+      maker_relationship: makerRelationship,
+      maker_note: makerNote,
+      feedback_prompt: feedbackPrompt,
     })
     .select("id")
     .single();
@@ -195,35 +183,16 @@ export async function createSubmission(
     return { error: t("submitFailed") };
   }
 
-  // 社区产品始终先人工审核；旧点子保留原有审核设置和免审权限。
-  if (input.type === "product") {
-    await runModerationPipeline({
-      targetType: "submission",
-      targetId: inserted.id,
-      content: `${title}\n${tagline}\n\n${description}`,
-      authorId: profile.id,
-      requireManual: true,
-    });
-  } else if (hasPermission(profile, "auto_publish_submissions")) {
-    await admin.from("submissions").update({ status: "published" }).eq("id", inserted.id);
-  } else {
-    await runModerationPipeline({
-      targetType: "submission",
-      targetId: inserted.id,
-      content: `${title}\n${tagline}\n\n${description}`,
-      authorId: profile.id,
-    });
-  }
+  // 社区产品始终先人工审核，不按旧点子规则免审或写入统一投稿冷却。
+  await runModerationPipeline({
+    targetType: "submission",
+    targetId: inserted.id,
+    content: `${title}\n${tagline}\n\n${description}`,
+    authorId: profile.id,
+    requireManual: true,
+  });
 
-  // submission_cooldown_until 现在只有 admin client 能写（见 0004_rls_hardening.sql），
-  // 因为普通用户不该能自己清空/改写这一列来绕过冷却。
-  if (input.type === "idea") {
-    const cooldownUntil = new Date(Date.now() + COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
-    await admin.from("profiles").update({ submission_cooldown_until: cooldownUntil }).eq("id", profile.id);
-  }
-
-  // 「不审核」模式下 runModerationPipeline 已经同步把状态改成了 published；
-  // 「人工」/「AI」模式这时候还是 pending（AI 的判定是异步的），查一下真实状态再告诉用户。
+  // 查询实际状态，避免与管理员同步审核发生竞争时向用户展示过时状态。
   const { data: finalRow } = await supabase.from("submissions").select("status").eq("id", inserted.id).maybeSingle();
   const published = finalRow?.status === "published";
 
@@ -233,7 +202,7 @@ export async function createSubmission(
     after(() =>
       awardXpByRule({
         userId: profile.id,
-        action: input.type === "product" ? "submission_product" : "submission_idea",
+        action: "submission_product",
         refType: "submission",
         refId: inserted.id,
       })
