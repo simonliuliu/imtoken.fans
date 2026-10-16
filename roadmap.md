@@ -166,3 +166,6 @@ PR #1–#4 已汇入 `codex/community-integration`（整合提交 `a3d0122`；20
 
 
 2026-10-16 正式登录与数据接入：6 项 production 环境变量已配置，正式回调已核验；0023 与新增 0024 通过受控事务执行，保留旧内容/互动及未知资料。两项 P1 和登录跳转/头像/账户草稿及竞态问题已修复，工程及独立 QA 通过，专用账号 RLS 实测通过。正式部署、密码登录/会话/退出、21 条产品读取、临时钱包登录和 Google 入口/回调检查通过；并发网址去重、真人 Google/外部钱包和其他业务全流程仍待验收。见 [任务卡](docs/tasks/vercel-live-auth.md) 与 [复核](docs/reviews/vercel-live-auth.md)。此前无数据库配置、未迁移的记录为历史状态。
+## 2026-10-16 浏览器标签品牌修正
+
+首页中英文及默认标题改为 imToken Fans，favicon/icon/apple-icon 改用本站玫红标志。i18n、lint、build及中英文页面head检查通过；提交前同步最新主线并保留双方路线图记录，本地交付，待PR审查，未部署。见[任务记录](docs/tasks/M1-browser-tab-brand.md)。
