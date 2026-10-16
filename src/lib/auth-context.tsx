@@ -19,6 +19,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAdmin: boolean;
   loading: boolean;
+  sessionEpoch: number;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(() => isSupabaseConfigured());
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const rawUserRef = useRef<User | null>(null);
   const sessionVersionRef = useRef(0);
 
@@ -46,21 +48,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function syncSession(rawUser: User | null) {
       const version = ++sessionVersionRef.current;
+      if (rawUserRef.current?.id !== rawUser?.id) {
+        setSessionEpoch((value) => value + 1);
+        // Immediately hide the old account while the new profile is being resolved.
+        setUser(null);
+        setIsAdmin(false);
+        setLoading(Boolean(rawUser));
+      }
       rawUserRef.current = rawUser;
       const base = deriveUser(rawUser);
       if (!rawUser || !base) {
         if (!cancelled) {
           setUser(null);
           setIsAdmin(false);
+          setLoading(false);
         }
         return;
       }
+      // Same-account token refresh must preserve mounted drafts and editors.
       // profiles 是公开可读的（RLS: select using (true)），客户端直接查就行。
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, username, display_name, avatar_url, bio")
-        .eq("id", rawUser.id)
-        .maybeSingle();
+      const { data: profile } = await Promise.resolve(
+        supabase
+          .from("profiles")
+          .select("role, username, display_name, avatar_url, bio")
+          .eq("id", rawUser.id)
+          .maybeSingle()
+      ).catch(() => ({ data: null }));
+      // 较早的账号请求不能覆盖退出/切换账号后已开始的会话。
       if (cancelled || version !== sessionVersionRef.current) return;
       setIsAdmin(profile?.role === "admin");
       setUser({
@@ -70,15 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatarUrl: profile?.avatar_url ?? null,
         bio: profile?.bio ?? null,
       });
+      setLoading(false);
     }
 
     async function loadInitialSession() {
+      const initialVersion = sessionVersionRef.current;
       for (let attempt = 0; attempt <= INITIAL_LOAD_RETRY_DELAYS_MS.length; attempt++) {
         try {
           const version = sessionVersionRef.current;
           const { data, error } = await supabase.auth.getUser();
           if (version !== sessionVersionRef.current) return;
           if (error) throw error;
+          if (cancelled || initialVersion !== sessionVersionRef.current) return;
           await syncSession(data.user);
           return;
         } catch {
@@ -90,14 +107,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     loadInitialSession().finally(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled && sessionVersionRef.current === 0) setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       syncSession(session?.user ?? null)
-        .catch(() => {})
-        .finally(() => {
-          if (!cancelled) setLoading(false);
+        .catch(() => {
+          // 仅当前账号的失败可以结束加载；晚到的旧请求不能清掉新会话。
+          if (!cancelled && rawUserRef.current?.id === session?.user?.id) {
+            setUser(null);
+            setIsAdmin(false);
+            setLoading(false);
+          }
         });
     });
 
@@ -132,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     sessionVersionRef.current++;
+    setSessionEpoch((value) => value + 1);
     rawUserRef.current = null;
     setUser(null);
     setIsAdmin(false);
@@ -143,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, sessionEpoch, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

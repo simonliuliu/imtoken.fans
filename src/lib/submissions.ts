@@ -93,6 +93,7 @@ export async function getUserVoteFlags(submissionId: string): Promise<{ paid: bo
 }
 
 export interface ProductEngagement {
+  viewerId: string | null;
   viewerSupported: boolean;
   viewerRating: ProductRating | null;
   reviews: ProductRating[];
@@ -152,6 +153,7 @@ export async function getProductEngagement(submissionId: string): Promise<Produc
   });
 
   return {
+    viewerId: user?.id ?? null,
     viewerSupported: Boolean(supportResult.data),
     viewerRating: user ? reviews.find((review) => review.user_id === user.id) ?? null : null,
     reviews,

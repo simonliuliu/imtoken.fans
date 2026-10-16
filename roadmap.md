@@ -45,6 +45,8 @@
 
 ## M1 · 品牌、导航与首页 · P0 · 当前进行中
 
+- [x] 2026-10-16 按 review 精简四板块：取消介绍大卡片、重复参与／安全提醒，导航保留唯一发帖入口，分类先于分类内排序；新建通用设计规则并自动注入 Claude 请求。i18n/lint/build 与中英桌面／手机验证通过，等待用户 review，未部署。见 [任务与验证](docs/tasks/M1-board-simplify.md)。
+
 - [x] 按新 PRD 调整 M1-A2 演示：产品共创、三子区、安全故事/案例分类、分类型本地支持；同步双语导航/发布示例。第二轮首页移除重复入口，交用户 review，视觉尚待确认。
 
 - [x] 核对品牌素材，完成首页玫红/深蓝/白底色彩与社区组件样式（等待视觉 review）。
@@ -54,7 +56,7 @@
 - [x] 首页 AI 产品/点子归入共创入口；保留旧页面，未实现路径准确说明。
 - [x] 安装锁定依赖、阅读本地 Next.js 指南；首页 i18n/lint/build 与中英移动端预览验证。
 
-M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS Code 与固定端口配置。剩余品牌说明页、图标/分享图及全站一致性另拆下一批；不能把 M1-A 等同完整 M1。见 [本批 review](docs/reviews/M1-A-home.md)。
+M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS Code 与固定端口配置。品牌说明页、图标/分享图及全站一致性在 [M1-B](docs/tasks/M1-B-brand-consistency.md)继续；不能把 M1-A 等同完整 M1。见 [本批 review](docs/reviews/M1-A-home.md)。
 
 用户review：旧首页重复、窄、介绍过多，要求参考小米社区，能进入四板块看虚拟帖子。[M1-A2任务](docs/tasks/M1-A2-community-preview.md)已交付流体首页、板块/详情、12篇双语演示帖和本地互动，等待review；不以演示替代M2真实模型。
 
@@ -83,6 +85,7 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 - [ ] 产品处理/合并权限、负责人、反馈状态/历史、回应，落实实际承接人员。
 - [ ] 人工合并与撤销：支持者交集去重、取消支持不回弹、原文/评论/附件/旧链接追溯、链式/并发/回滚、审计与通知，独立 QA（FB-07）。
 - [x] Product Hunter 首版界面与代码已整合：投稿资料、发现筛选、支持、评分与详情；集成构建通过。
+- [x] 2026-10-16 用户纠正：产品猎手归入既有「社区产品」分类原位展示，移除独立引流入口；旧列表地址兼容、详情返回、双语/移动端和 17 项相关回归通过，待用户 review / 合入 main。见 [本批 review](docs/reviews/community-products-in-place.md)。
 - [ ] Product Hunter 真实业务验收：先修复审核/RLS、历史回填等 QA 问题，再验证迁移和四角色写入；当前不能标为上线完成。见 [独立 QA](docs/reviews/M3-C-product-hunter-security.md)。
 - [ ] 授权发布产品公告与版本日志，前台列表/详情、平台/版本筛选、来源和反馈双向关联（NEWS）。
 - [ ] 状态变化通知；提交→处理→结果→用户验证完整验收。
@@ -115,6 +118,8 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 
 [任务卡](docs/tasks/M1-token-personas-entry.md) · [review](docs/reviews/M1-token-personas-entry.md)。
 
+2026-10-16 局部更新：首页五个数字币人改为直接访问用户指定的 B-Man 综合地址；综合交流保留角色预览。双语、lint、build、桌面/手机实际导航检查通过，待 PR / 用户 review，未部署。见 [外链任务](docs/tasks/M1-token-personas-external-link.md) 与 [检查记录](docs/reviews/M1-token-personas-external-link.md)。
+
 ## M6 · 运营增强 · P2
 
 - [ ] 关注/收藏、定向更新通知。
@@ -127,11 +132,19 @@ M1-A 已交付首页、Header/Footer、四板块导览、登录品牌小修、VS
 
 ## 最新执行记录
 
+2026-10-16 Product Hunter 登录体验：在 `codex/product-hunter-auth-ux` 修复会话加载误判、统一投稿/支持/评分/评论登录入口与多语言回跳、账号切换和个人状态刷新；10 条本地模拟浏览器回归、i18n（1249 键）、lint、build 与独立 QA 通过。真实外部登录/数据库未验；不包含旧审核/RLS与草稿问题修复，见 [review](docs/reviews/product-hunter-auth-ux.md)。
+2026-10-16 Jack反馈真实接入：合入最新main67a5b53登录/数据库安全修复，新增0025反馈专用迁移及RPC；统一「发帖」产品反馈模块字段，真实Admin编辑/审计、IDEA和评论支持、合并/撤销持久化契约；移除虚构IDEA种子及假管理员入口。i18n1432键、lint、tsc、Webpack构建、主线6项安全回归、模拟PG71项及独立会话/草稿审查通过；浏览器表单/缺配置失败路径/手机通过。目标Supabase0025未执行，真实账号保存刷新和多连接并发待部署验证；通知/视频/旧审核队列未接，不标完整M3验收，见[任务记录](docs/tasks/product-feedback-persistence.md)。
+
+2026-10-16 Jack产品反馈主线整合：从最新`origin/main`（e1c40b1）创建`codex/jack-product-cooperation-feedback`，将IDEA原型嵌入「产品反馈」分类，保留主线全部/社区产品/公告和产品猎手入口；分类切换保留本地状态。i18n1374键、lint、tsc、Webpack构建通过，浏览器中英/390px/分类与票数保留验证，见[整合任务](docs/tasks/jack-product-cooperation-feedback.md)。未上线、未写库、未合并main，等待review。
+
 2026-10-15 分支整合与本地复核：`codex/community-integration` 已保存首页横幅/排序/评论数更新，合入协作规则与 Vercel 说明；路线图冲突保留双方记录。i18n1092键、lint、build通过，本地固定3000运行，中英首页/四板块/详情/图片及横幅、排序、本地支持验证通过。品牌统一分支仅有未完成任务卡，不合入。远端 main 仍需其他维护者批准PR；不绕过保护，详见[整合记录](docs/tasks/community-integration.md)。
 
 2026-10-15 团队协作：按用户要求将 GitHub 仓库改为公开；全历史凭证复查未发现本地配置密钥或常见令牌。新增 `CONTRIBUTING.md`、PR 模板及 AGENTS 规则，要求开工同步主线、独立任务分支、每次提交前同步远端、冲突处理与 PR 审查。此次规则更新在 `codex/team-git-workflow` 分支交付；当前未跟踪的 `docs/design/community-banners/` 属其他工作，保留且不提交。仅协作设置与文档变更，不推进产品阶段。
 
 2026-10-15 Vercel 自动预览：已按用户授权创建 `simonliulius-projects/imtoken-fans`，连接 GitHub 本仓库；首次 main 构建与分支预览验证进行中。未配置数据库/钱包/AI 密钥，不修改数据；当前为虚拟内容演示，真实业务验收与产品 review 状态不变。详见[任务记录](docs/tasks/vercel-auto-preview.md)。
+2026-10-16 产品共创 IDEA 原型已交付：按用户提供的 Canny Demo 实现提交/查重、IDEA及评论/回复独立投票、Admin演示编辑/公开标记、最早主帖合并/撤销和进展看板；i18n1207键、lint、tsc、Webpack构建通过，默认Turbopack受本机端口限制失败。中英/390px及浏览器核心交互验证，独立QA发现1项P2并修复复查。详见[任务卡](docs/tasks/cooperation-idea-preview.md)与[review](docs/reviews/cooperation-idea-preview.md)。等待用户review；本地演示不计为M3真实业务完成，不写数据库或接通知/上传。
+
+2026-10-15 产品反馈专项调研：完成 [Canny 调研与实施建议](docs/tasks/product-feedback-research.md)，核对本地演示、旧票种、媒体与权限缺口；提出共创反馈专用列表/表单/时间线、多来源证据及分批闭环。只读查阅 Canny 官方资料，文档交付；未实现应用、未验远程库、未执行迁移或新增渠道，M3 待办和用户 review 门槛不变。
 
 2026-10-15 GitHub 首次保存：用户授权创建私有仓库 [simonliuliu/imtoken.fans](https://github.com/simonliuliu/imtoken.fans) 并提交当前工程。待提交文件的本地配置值/常见密钥扫描未发现真实凭证，确认 `.env.local`、依赖及构建结果被忽略；i18n（1084键）、lint、build通过。README 补充新手保存说明；本次不涉及网站部署或数据库变更，当前产品 review 状态不变。
 
@@ -166,3 +179,10 @@ PR #1–#4 已汇入 `codex/community-integration`（整合提交 `a3d0122`；20
 
 
 2026-10-16 正式登录与数据接入：6 项 production 环境变量已配置，正式回调已核验；0023 与新增 0024 通过受控事务执行，保留旧内容/互动及未知资料。两项 P1 和登录跳转/头像/账户草稿及竞态问题已修复，工程及独立 QA 通过，专用账号 RLS 实测通过。正式部署、密码登录/会话/退出、21 条产品读取、临时钱包登录和 Google 入口/回调检查通过；并发网址去重、真人 Google/外部钱包和其他业务全流程仍待验收。见 [任务卡](docs/tasks/vercel-live-auth.md) 与 [复核](docs/reviews/vercel-live-auth.md)。此前无数据库配置、未迁移的记录为历史状态。
+## 2026-10-16 浏览器标签品牌修正
+
+首页中英文及默认标题改为 imToken Fans，favicon/icon/apple-icon 改用本站玫红标志。i18n、lint、build及中英文页面head检查通过；提交前同步最新主线并保留双方路线图记录，本地交付，待PR审查，未部署。见[任务记录](docs/tasks/M1-browser-tab-brand.md)。
+
+## 2026-10-16 全量 PR 集成
+
+#6/#7/#8/#9/#13/#14/#15 全部纳入独立集成分支，冲突保留正式认证安全保护、社区产品原位展示、真实反馈与精简板块。品牌本地未提交的 25 个文件已完整保存为 #14。1445 键 i18n、无警告 lint、生产构建、6 项安全回归及独立 71 项反馈测试通过；0025 已执行，历史数据数量保留，目标库回滚 RPC 和匿名权限实测通过。统一 PR 合并与正式 Vercel 部署进行中；视觉 review、附件视频/通知/旧审核及多连接并发验收保留。见 [集成任务](docs/tasks/all-pr-integration.md)。

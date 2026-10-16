@@ -20,7 +20,7 @@ export function LanguageSwitcher() {
         <button
           key={l}
           type="button"
-          onClick={() => router.replace(pathname, { locale: l })}
+          onClick={() => router.replace(`${pathname}${window.location.search}${window.location.hash}`, { locale: l })}
           aria-current={locale === l}
           className={`rounded-full px-2.5 py-1 transition-colors ${
             locale === l ? "bg-brand text-white" : "text-muted hover:text-ink"

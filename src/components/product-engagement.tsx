@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { toggleProductSupport, upsertProductRating } from "@/app/actions/product-hunter";
 import {
@@ -15,9 +15,45 @@ import type {
 } from "@/lib/types";
 import { Avatar } from "@/components/avatar";
 import { LevelBadge } from "@/components/level-badge";
+import { AuthLoading } from "@/components/auth-loading";
+import { useAuth } from "@/lib/auth-context";
+import { getSignInHref } from "@/lib/auth-navigation";
 
-export function ProductEngagement({
+export function ProductEngagement(props: {
+  submissionId: string;
+  submittedBy: string;
+  initialViewerId: string | null;
+  initialSupportCount: number;
+  initialSupported: boolean;
+  ratingAverage: number | null;
+  ratingCount: number;
+  reviews: ProductRating[];
+}) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const viewerId = user?.id ?? null;
+
+  // 切换账号/退出时跟随社区会话，并重新获取这个用户自己的支持状态；不沿用上一账号的标记。
+  useEffect(() => {
+    if (!loading && viewerId !== props.initialViewerId) router.refresh();
+  }, [loading, viewerId, props.initialViewerId, router]);
+
+  return (
+    <ProductEngagementContent
+      key={`${viewerId ?? "guest"}:${props.initialViewerId ?? "guest"}`}
+      {...props}
+      authLoading={loading || viewerId !== props.initialViewerId}
+      isLoggedIn={Boolean(user)}
+      isOwner={viewerId === props.submittedBy}
+      initialSupported={viewerId === props.initialViewerId && props.initialSupported}
+      viewerRating={props.reviews.find((review) => review.user_id === viewerId) ?? null}
+    />
+  );
+}
+
+function ProductEngagementContent({
   submissionId,
+  authLoading,
   isLoggedIn,
   isOwner,
   initialSupportCount,
@@ -28,6 +64,7 @@ export function ProductEngagement({
   viewerRating,
 }: {
   submissionId: string;
+  authLoading: boolean;
   isLoggedIn: boolean;
   isOwner: boolean;
   initialSupportCount: number;
@@ -38,6 +75,7 @@ export function ProductEngagement({
   viewerRating: ProductRating | null;
 }) {
   const t = useTranslations("productRating");
+  const locale = useLocale();
   const format = useFormatter();
   const pathname = usePathname();
   const router = useRouter();
@@ -56,7 +94,7 @@ export function ProductEngagement({
     () => [5, 4, 3, 2, 1].map((star) => ({ star, count: reviews.filter((review) => review.rating === star).length })),
     [reviews]
   );
-  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(pathname)}`;
+  const signInHref = getSignInHref(`${pathname}#product-rating`, locale);
 
   function handleSupport() {
     setError(null);
@@ -116,7 +154,7 @@ export function ProductEngagement({
             <h2 className="mt-1 text-lg font-bold text-ink">{t("supportTitle")}</h2>
             <p className="mt-1 text-sm leading-6 text-muted">{t("supportDescription")}</p>
           </div>
-          {isLoggedIn ? (
+          {authLoading ? <AuthLoading compact /> : isLoggedIn ? (
             <button
               type="button"
               aria-pressed={supported}
@@ -165,7 +203,7 @@ export function ProductEngagement({
 
           <div className="lg:border-l lg:border-line lg:pl-6">
             <h2 className="text-lg font-bold text-ink">{viewerRating ? t("editTitle") : t("formTitle")}</h2>
-            {isOwner ? (
+            {authLoading ? <AuthLoading compact /> : isOwner ? (
               <p className="mt-2 rounded-xl bg-surface-2 px-4 py-3 text-sm leading-6 text-muted">{t("ownerCannotRate")}</p>
             ) : !isLoggedIn ? (
               <p className="mt-2 text-sm text-muted">

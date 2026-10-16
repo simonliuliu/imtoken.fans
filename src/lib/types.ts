@@ -274,7 +274,7 @@ export const BADGE_INFO: Record<string, Badge> = {
   // —— 人工颁发（后台下拉菜单里的选项）——
   official: { icon: "✅", name: "官方认证", description: "已验证身份的官方 / 品牌账号", grantable: true },
   icoin: { icon: "🪙", name: "iCoin 持有者", description: "持有 iCoin 的社区成员", grantable: true },
-  founder: { icon: "🚀", name: "创始团队", description: "imAihunt 创始与核心团队成员", grantable: true },
+  founder: { icon: "🚀", name: "创始团队", description: "imToken Fans 创始与核心团队成员", grantable: true },
   moderator: { icon: "🛡️", name: "社区版主", description: "协助维护社区秩序", grantable: true },
   partner: { icon: "🤝", name: "合作伙伴", description: "官方合作的机构或项目方", grantable: true },
   investor: { icon: "💼", name: "认证投资人", description: "经核实的投资人身份", grantable: true },
@@ -292,7 +292,7 @@ const BADGE_INFO_EN: Record<string, { name: string; description: string }> = {
 
   official: { name: "Official", description: "Verified official / brand account" },
   icoin: { name: "iCoin Holder", description: "Community member holding iCoin" },
-  founder: { name: "Founding Team", description: "imAihunt founding and core team" },
+  founder: { name: "Founding Team", description: "imToken Fans founding and core team" },
   moderator: { name: "Moderator", description: "Helps keep the community in order" },
   partner: { name: "Partner", description: "Official partner organisation or project" },
   investor: { name: "Verified Investor", description: "Verified investor identity" },

@@ -32,13 +32,15 @@ import {
 import { UserBadgeInline } from "@/components/user-badge-inline";
 import { UserHoverCard } from "@/components/user-hover-card";
 import { Modal } from "@/components/modal";
+import { getSignInHref } from "@/lib/auth-navigation";
+import { useAuth } from "@/lib/auth-context";
+import { AuthLoading } from "@/components/auth-loading";
 
 const REPORT_REASONS = Object.keys(COMMENT_REPORT_REASON_LABEL) as CommentReportReason[];
 const REPLIES_PER_PAGE = 10;
 
 export function CommentForm({
   submissionId,
-  isLoggedIn,
   parentId,
   autoFocus,
   initialBody = "",
@@ -52,6 +54,9 @@ export function CommentForm({
   onPosted?: (comment?: CommentWithAuthor) => void;
 }) {
   const t = useTranslations("comments");
+  const locale = useLocale();
+  const { user, loading } = useAuth();
+  const isLoggedIn = Boolean(user);
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const [body, setBody] = useState(initialBody);
@@ -122,6 +127,8 @@ export function CommentForm({
     });
   }
 
+  if (loading) return <AuthLoading compact />;
+
   return (
     <form onSubmit={handleSubmit} className="relative">
       <textarea
@@ -169,13 +176,17 @@ export function CommentForm({
 
       {error && <p className="mt-2 text-xs text-risk">{error}</p>}
       <div className="mt-2 flex justify-end">
-        <button
+        {!isLoggedIn ? (
+          <Link href={getSignInHref(`${pathname}#comments`, locale)} className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-ink">
+            {t("placeholderSignedOut")}
+          </Link>
+        ) : <button
           type="submit"
           disabled={!isLoggedIn || isPending || body.trim().length < 2}
           className="rounded-full bg-brand px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? t("posting") : parentId ? t("reply") : t("post")}
-        </button>
+        </button>}
       </div>
     </form>
   );

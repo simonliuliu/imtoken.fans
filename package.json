@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --port 3000 --hostname 127.0.0.1",
     "lint": "eslint",
-    "check-i18n": "node scripts/check-i18n.mjs"
+    "check-i18n": "node scripts/check-i18n.mjs",
+    "test:auth": "playwright test tests/product-hunter-auth.spec.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
@@ -20,6 +21,7 @@
     "viem": "^2.56.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

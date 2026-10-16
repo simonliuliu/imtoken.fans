@@ -33,6 +33,7 @@ export async function SubmissionDetail({
 }) {
   const t = await getTranslations("submissionDetail");
   const tc = await getTranslations("common");
+  const community = await getTranslations("community");
   const locale = await getLocale();
   const format = await getFormatter();
   const profile = await getCurrentProfile();
@@ -50,6 +51,15 @@ export async function SubmissionDetail({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {submission.type === "product" && (
+        <nav className="community-breadcrumb mb-6" aria-label={community("breadcrumb")}>
+          <Link href="/community/feedback">{community("sections.feedback.name")}</Link>
+          <span aria-hidden>/</span>
+          <Link href="/community/feedback?category=builds">{community("categories.builds")}</Link>
+          <span aria-hidden>/</span>
+          <span>{submission.title}</span>
+        </nav>
+      )}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px] lg:gap-10">
         <div className="min-w-0">
           {/* 头部 */}
@@ -207,14 +217,13 @@ export async function SubmissionDetail({
           {submission.type === "product" && productEngagement && (
             <ProductEngagementSection
               submissionId={submission.id}
-              isLoggedIn={isLoggedIn}
-              isOwner={isOwner}
+              submittedBy={submission.submitted_by}
+              initialViewerId={productEngagement.viewerId}
               initialSupportCount={submission.support_count}
               initialSupported={productEngagement.viewerSupported}
               ratingAverage={submission.rating_average}
               ratingCount={submission.rating_count}
               reviews={productEngagement.reviews}
-              viewerRating={productEngagement.viewerRating}
             />
           )}
 

@@ -60,7 +60,6 @@ export default async function FaqPage() {
             { href: "/how-it-works", label: t("docsHow") },
             { href: "/for-makers", label: t("docsMakers") },
             { href: "/for-testers", label: t("docsTesters") },
-            { href: "/hackathon", label: t("docsHackathon") },
             { href: "/community-guidelines", label: t("docsGuidelines") },
           ].map((item) => (
             <Link

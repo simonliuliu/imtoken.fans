@@ -2,7 +2,7 @@
 
 面向 imToken 钱包用户的社区平台，由原 imAihunt 改造。四个一级板块：**钱包安全、产品共创、综合交流、活动区**。产品共创下设产品反馈、社区产品、产品公告；社区产品不限于 AI。钱包安全以官方/用户故事与案例为核心，交流首版支持币圈行情等论坛讨论。
 
-当前阶段（2026-10-15）：M1-A2 社区浏览演示已完成，等待用户review：首页、四板块列表、12篇中英演示帖详情，支持本地点赞/投票/评论/回复/发帖预览。已沿用原 Supabase，固定本地3000；演示内容独立于原数据库，真实四板块写入仍待后续开发。
+当前阶段（2026-10-16）：整合全站品牌、简化板块、登录体验、社区产品与真实产品反馈。正式环境已接入原 Supabase；其他演示内容仍有明确边界。进度与验证见 [本批集成](docs/tasks/all-pr-integration.md)，视觉效果待用户 review。
 
 本地预览：[http://localhost:3000/zh](http://localhost:3000/zh)。VS Code 打开本目录，在终端运行 `npm run dev`，或按 F5 选择「imToken Fans: 启动并预览 (3000)」。首次安装、停止服务和端口占用处理见 [本地启动说明](docs/local-development.md)。已有服务运行时直接查看，不要重复启动。
 
@@ -16,7 +16,7 @@
 - [多 agent 工作流与指挥示例](docs/agent-workflow.md)、[模型清单与成本依据](docs/agent-models.md)：角色 Prompt、模型分配、文件归属与升级规则。
 - [旧路线图](docs/archive/imaihunt-roadmap-v0.2.md)、[旧定位计划](docs/archive/imaihunt-product-execution-plan-v1.0.md)：只作历史参考。
 
-当前交付 [M1-A2 社区浏览演示](docs/reviews/M1-A2-community.md)，针对 [M1-A](docs/reviews/M1-A-home.md) 的重复内容、留白与浏览路径反馈修订。2026-10-15 已按新需求整理 PRD；界面尚未同步本轮命名与范围。下一步先复核演示并继续 review，再推进品牌页面、通用内容模型、安全与交流、产品共创（含人工合并/撤销、视频文件、社区产品与官方公告），最后整合活动区。完整首版须通过四板块验收。
+M1-A2 已交付首页、四板块列表/详情和本地互动，M1-B 补齐品牌说明页、图标和分享图。下一阶段为 M2-A 通用内容模型、迁移与历史关系，必须独立 QA；完整首版须通过四板块真实业务验收。
 
 多 agent 工作流已收敛为主聊天总调度、Claude Opus 5.5 设计、GPT 统一前后端开发；QA 按风险启用。Claude 经已验证的 magpie/Devin 临时 CLI 渠道自动调用；原生 developer/qa 配置在 `.codex/agents/`，设计配置在 `.codex/external-agents/`。通常最多两个工作者并发，普通改动由开发自检。M1-A 已按此分工执行；可说「首页 review 通过，按工作流继续下一批」，或直接指出需要调整的页面与效果。
 
@@ -197,7 +197,7 @@ roadmap.md                当前任务优先级与里程碑
 
 ## 部署到 Vercel
 
-本项目已在 `simonliulius-projects` 下创建 `imtoken-fans` 并连接本仓库。任务分支推送后查看 PR 的 Vercel 预览状态；合入 `main` 后更新主站。当前是未配置数据库等密钥的社区演示，真实登录与写入不在此次部署范围内。配置、验证结果与限制见 [自动预览任务记录](docs/tasks/vercel-auto-preview.md)。
+本项目已在 `simonliulius-projects` 下创建 `imtoken-fans` 并连接本仓库。任务分支推送后查看 PR 的 Vercel 预览状态；合入 `main` 后更新主站。正式环境已配置登录与数据库；分支预览不复制正式数据库凭证。最新反馈迁移及本批部署状态见 [本批集成](docs/tasks/all-pr-integration.md)。配置、验证结果与限制见 [自动预览任务记录](docs/tasks/vercel-auto-preview.md)。
 
 以下为后续启用真实业务时的通用配置步骤；不要把本地密钥直接写进公开仓库，也不要未经确认将生产高权限密钥用于外部 PR 预览。
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentProfile } from "@/lib/profile";
-import { sanitizeRedirect } from "@/lib/redirect";
+import { getAuthReturnPath, getSignInHref } from "@/lib/auth-navigation";
 import { OnboardingForm } from "@/components/onboarding-form";
 
 // 首次注册/登录后的引导页。已经走过引导（onboarded_at 有值）的人直接放行，
@@ -13,10 +13,11 @@ export default async function WelcomePage({
 }) {
   const t = await getTranslations("welcome");
   const { redirect: rawRedirect } = await searchParams;
-  const redirectTo = sanitizeRedirect(rawRedirect);
+  const locale = await getLocale();
+  const redirectTo = getAuthReturnPath(rawRedirect, locale);
 
   const profile = await getCurrentProfile();
-  if (!profile) redirect(`/auth/sign-in?redirect=${encodeURIComponent(`/welcome?redirect=${redirectTo}`)}`);
+  if (!profile) redirect(getAuthReturnPath(getSignInHref(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale), locale));
   if (profile.onboardedAt) redirect(redirectTo);
 
   return (

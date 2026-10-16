@@ -30,6 +30,12 @@ def main() -> int:
     parser.add_argument('--dry-run', action='store_true', help='Validate inputs without calling Claude')
     args = parser.parse_args()
     role = tomllib.loads((ROOT / '.codex/external-agents/designer.toml').read_text(encoding='utf-8'))
+    rules_path = ROOT / 'docs/design/design-rules.md'
+    if not rules_path.is_file():
+        parser.error('required design rules are missing: docs/design/design-rules.md')
+    rules = rules_path.read_text(encoding='utf-8')
+    if not rules.strip():
+        parser.error('required design rules must not be empty')
     if role['model'] != 'devin/claude-opus-5-5' or role.get('model_provider') != 'magpie' or role.get('transport') != 'codex_exec':
         parser.error('designer model has changed; review this launcher before using it')
     if not args.brief.is_file():
@@ -53,12 +59,13 @@ def main() -> int:
         parser.error('existing user-level magpie provider is required; no credentials are installed by this script')
     plan = {'model': role['model'], 'provider': 'magpie (existing configuration)',
             'reasoning_effort': role['model_reasoning_effort'], 'brief_chars': len(brief),
+            'design_rules': str(rules_path.relative_to(ROOT)), 'design_rules_chars': len(rules),
             'image_count': len(args.image), 'output': str(args.output.resolve()),
             'timeout_seconds': args.timeout, 'automatic_retries': 0, 'calls_claude': not args.dry_run}
     print(json.dumps(plan, ensure_ascii=False), flush=True)
     if args.dry_run:
         return 0
-    prompt = role['developer_instructions'] + '\n\n本次设计 Brief：\n' + brief + '\n\n只返回设计交付 Markdown。禁止调用任何工具或读写文件；不要自述模型型号。'
+    prompt = role['developer_instructions'] + '\n\n项目通用设计规则（必须遵循，用户最新要求优先）：\n' + rules + '\n\n本次设计 Brief：\n' + brief + '\n\n只返回设计交付 Markdown。禁止调用任何工具或读写文件；不要自述模型型号。'
     with tempfile.TemporaryDirectory(prefix='imtoken-fans-design-') as workdir:
         cmd = [cli, 'exec', '--ephemeral', '--skip-git-repo-check', '-C', workdir,
                '-m', role['model'], '-s', 'read-only', '-c', f'model_provider="{role["model_provider"]}"',

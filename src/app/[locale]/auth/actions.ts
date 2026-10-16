@@ -2,11 +2,11 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { sanitizeRedirect } from "@/lib/redirect";
+import { getAuthReturnPath, getSignInHref } from "@/lib/auth-navigation";
 import { normalizeUsername, usernameSyntheticEmail } from "@/lib/username";
 
 export interface AuthActionState {
@@ -30,6 +30,7 @@ export async function signUpWithPassword(input: {
   email: string;
   password: string;
   nickname: string;
+  redirectTo?: string;
 }): Promise<AuthActionState> {
   const t = await getTranslations("errors");
   if (!isSupabaseConfigured()) {
@@ -38,12 +39,13 @@ export async function signUpWithPassword(input: {
 
   const supabase = await createClient();
   const origin = await getOrigin();
+  const redirectTo = getAuthReturnPath(input.redirectTo, await getLocale());
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
     options: {
       data: { username: input.nickname },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
     },
   });
 
@@ -138,10 +140,12 @@ export async function signInWithUsername(input: {
 
 export async function signInWithGoogle(redirectTo: string): Promise<void> {
   const t = await getTranslations("errors");
-  const safeRedirect = sanitizeRedirect(redirectTo);
+  const locale = await getLocale();
+  const safeRedirect = getAuthReturnPath(redirectTo, locale);
+  const signInHref = getAuthReturnPath(getSignInHref(safeRedirect, locale), locale);
 
   if (!isSupabaseConfigured()) {
-    redirect(`/auth/sign-in?error=${encodeURIComponent(t("supabaseNotConfigured"))}`);
+    redirect(`${signInHref}&error=${encodeURIComponent(t("supabaseNotConfigured"))}`);
   }
 
   const supabase = await createClient();
@@ -154,7 +158,7 @@ export async function signInWithGoogle(redirectTo: string): Promise<void> {
   });
 
   if (error || !data.url) {
-    redirect(`/auth/sign-in?error=${encodeURIComponent(error?.message ?? t("googleSignInFailed"))}`);
+    redirect(`${signInHref}&error=${encodeURIComponent(error?.message ?? t("googleSignInFailed"))}`);
   }
 
   redirect(data.url);
