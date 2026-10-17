@@ -6,6 +6,7 @@ import {
   getLotterySettings,
 } from "@/lib/activities";
 import { getXpRules } from "@/lib/xp";
+import { CommunityActivityPanel } from "@/components/admin/community-activity-panel";
 import { AdminPanel, NoPermissionNotice } from "@/components/admin/ui";
 import {
   CheckinSettingsPanel,
@@ -33,6 +34,7 @@ export default async function AdminCampaignsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CommunityActivityPanel />
       <CheckinSettingsPanel settings={checkinSettings} />
       <XpRulesPanel rules={xpRules} />
       <LotterySettingsPanel settings={lotterySettings} />

@@ -230,7 +230,9 @@ export type NotificationType = "mention" | "reply" | "level_up" | "lottery_ticke
 
 
 export interface NotificationDetail {
-  kind?: "reply" | "mention" | "follow_post" | "follow_comment";
+  kind?: "reply" | "mention" | "follow_post" | "follow_comment" | "activity_started" | "activity_cancelled" | "activity_approved" | "activity_rejected";
+  activity_title?: string;
+  activity_id?: string;
   /** level_up：新等级 */
   level?: number;
   /** lottery_ticket / xp_adjust：变动量，负数 = 被收回 */

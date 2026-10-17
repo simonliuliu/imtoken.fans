@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { getSignInHref } from "@/lib/auth-navigation";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { drawLottery, type LotteryResult } from "@/app/actions/activities";
@@ -68,7 +69,9 @@ export function LotteryWheel({
   tickets: serverTickets,
   drawsLeft: serverDrawsLeft,
   recentWinners,
-  isLoggedIn,
+  expectedUserId,
+  stateVersion,
+  onUpdated,
 }: {
   prizes: LotteryPrize[];
   settings: LotterySettings;
@@ -76,8 +79,11 @@ export function LotteryWheel({
   /** null = 没设每日上限，只看券够不够 */
   drawsLeft: number | null;
   recentWinners: LotteryWinner[];
-  isLoggedIn: boolean;
+  expectedUserId: string | null;
+  stateVersion: number;
+  onUpdated: () => void;
 }) {
+  const isLoggedIn = Boolean(expectedUserId);
   const t = useTranslations("lottery");
   const format = useFormatter();
   const formatWindowTime = makeWindowTimeFormatter(format);
@@ -93,9 +99,9 @@ export function LotteryWheel({
   // 服务端数据回来（router.refresh 之后 props 变了）就丢掉本地覆盖值，以服务端为准——
   // 这是 React 官方推荐的「props 变化时重置 state」写法：在渲染期比对并 setState。
   const [local, setLocal] = useState<{ tickets: number; drawsLeft: number | null } | null>(null);
-  const [syncedProps, setSyncedProps] = useState({ tickets: serverTickets, drawsLeft: serverDrawsLeft });
-  if (syncedProps.tickets !== serverTickets || syncedProps.drawsLeft !== serverDrawsLeft) {
-    setSyncedProps({ tickets: serverTickets, drawsLeft: serverDrawsLeft });
+  const [syncedProps, setSyncedProps] = useState({ tickets: serverTickets, drawsLeft: serverDrawsLeft, version: stateVersion });
+  if (syncedProps.tickets !== serverTickets || syncedProps.drawsLeft !== serverDrawsLeft || syncedProps.version !== stateVersion) {
+    setSyncedProps({ tickets: serverTickets, drawsLeft: serverDrawsLeft, version: stateVersion });
     setLocal(null);
   }
   const tickets = local?.tickets ?? serverTickets;
@@ -106,13 +112,17 @@ export function LotteryWheel({
   const slotRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
   }, []);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; stoppedRef.current = true; clearTimer(); };
+  }, [clearTimer]);
 
   // 按奖位序号（0-7）建索引：服务端返回的是 position，要映射到九宫格的格子。
   const prizeBySlot = new Map(prizes.map((prize) => [prize.position, prize]));
@@ -177,7 +187,9 @@ export function LotteryWheel({
     setSpinning(true);
     startSpin();
 
-    const draw = await drawLottery();
+    if (!expectedUserId) return;
+    const draw = await drawLottery(expectedUserId);
+    if (!mountedRef.current) return;
 
     if (!draw.ok || draw.prizePosition === null) {
       stoppedRef.current = true;
@@ -187,6 +199,7 @@ export function LotteryWheel({
       // 失败时服务端也会把当前余额回传（比如"券不够了"），顺手同步过来。
       setLocal({ tickets: draw.ticketBalance, drawsLeft: draw.drawsLeft });
       setError(draw.message);
+      onUpdated();
       return;
     }
 
@@ -197,6 +210,7 @@ export function LotteryWheel({
       setResult(draw);
       // 只有真的中了东西才撒花，"谢谢参与"撒花会很讽刺。
       if (draw.prizeKind !== "none") fireConfetti();
+      onUpdated();
       router.refresh();
     });
   }
@@ -219,7 +233,7 @@ export function LotteryWheel({
   return (
     <section
       className="relative overflow-hidden rounded-2xl border border-line p-5"
-      style={{ background: "linear-gradient(150deg,#312e81 0%,#4c1d95 45%,#831843 100%)" }}
+      style={{ background: "var(--color-surface)" }}
     >
       {/* 顶部光斑，让深色面板不至于死板 */}
       <div
@@ -248,9 +262,9 @@ export function LotteryWheel({
 
       <div className="relative flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold text-white sm:text-xl">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-ink sm:text-xl">
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-base"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-soft text-base"
               aria-hidden
             >
               🎰
@@ -260,10 +274,10 @@ export function LotteryWheel({
           {/* 只在有话可说时才渲染：活动没开放/没开始/已结束，或者设了每日次数上限。
               "每次消耗 N 张券"不写在这里——抽奖按钮下面就挂着券数量，右边奖品表也写着，
               标题底下再说一遍是第三遍。 */}
-          {subtitle && <p className="mt-1 text-sm text-white/70">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           {/* 正在进行中的活动也要把截止时间摆出来，制造一点紧迫感。 */}
           {windowStatus === "open" && settings.endsAt && (
-            <p className="mt-0.5 font-mono text-[11px] text-amber-200/90">
+            <p className="mt-0.5 font-mono text-[11px] text-brand-ink">
               {t("endsAt", { time: formatWindowTime(settings.endsAt) })}
             </p>
           )}
@@ -279,8 +293,8 @@ export function LotteryWheel({
               🎟️
             </span>
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-wide text-white/60">{t("myTickets")}</p>
-              <p className="text-2xl font-extrabold leading-tight text-white">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-muted">{t("myTickets")}</p>
+              <p className="text-2xl font-extrabold leading-tight text-brand-ink">
                 {tickets}
                 <span className="ml-0.5 text-xs font-semibold">{t("ticketUnit")}</span>
               </p>
@@ -328,7 +342,7 @@ export function LotteryWheel({
                   ? "wheel-winner border-amber-300 bg-white"
                   : isActive
                     ? "scale-[1.06] border-amber-300 bg-white shadow-[0_0_22px_rgba(251,191,36,.75)]"
-                    : "border-white/15 bg-white/10"
+                    : "border-line bg-surface-2"
               }`}
             >
               <span className={`text-2xl leading-none sm:text-[28px] ${soldOut ? "opacity-40 grayscale" : ""}`} aria-hidden>
@@ -336,7 +350,7 @@ export function LotteryWheel({
               </span>
               <span
                 className={`line-clamp-2 text-[10px] font-semibold leading-tight sm:text-[11px] ${
-                  isActive || isWinner ? "text-ink" : "text-white/85"
+                  isActive || isWinner ? "text-ink" : "text-ink"
                 }`}
               >
                 {prize?.name || t("emptySlot")}
@@ -344,7 +358,7 @@ export function LotteryWheel({
               {prize && prize.stock !== null && (
                 <span
                   className={`font-mono text-[9px] ${
-                    isActive || isWinner ? "text-muted" : soldOut ? "text-white/40" : "text-amber-200"
+                    isActive || isWinner ? "text-muted" : soldOut ? "text-faint" : "text-brand-ink"
                   }`}
                 >
                   {soldOut ? t("soldOut") : t("remaining", { count: prize.stock - prize.awardedCount })}
@@ -356,7 +370,7 @@ export function LotteryWheel({
       </div>
 
       {error && (
-        <p className="relative mt-4 rounded-xl bg-black/25 px-3 py-2 text-center text-xs font-medium text-amber-200">
+        <p className="relative mt-4 rounded-xl bg-brand-soft px-3 py-2 text-center text-xs font-medium text-brand-ink">
           {error}
         </p>
       )}
@@ -368,13 +382,13 @@ export function LotteryWheel({
 
       {/* 最近中奖播报 */}
       {recentWinners.length > 0 && (
-        <div className="relative mt-5 overflow-hidden rounded-xl bg-black/20 py-2">
+        <div className="relative mt-5 overflow-hidden rounded-xl bg-surface-2 py-2">
           <div className="marquee flex w-max gap-6 px-3">
             {/* 内容复制一份接在后面，滚到一半时和开头无缝衔接 */}
             {[...recentWinners, ...recentWinners].map((winner, i) => (
-              <span key={`${winner.id}-${i}`} className="flex shrink-0 items-center gap-1.5 text-xs text-white/80">
+              <span key={`${winner.id}-${i}`} className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
                 <LevelBadge level={winner.level} size="xs" showIcon={false} />
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-ink">
                   {winner.displayName || winner.username || t("mysteryUser")}
                 </span>
                 {t("won")}
@@ -413,12 +427,13 @@ function DrawButton({
   onClick: () => void;
   t: LotteryT;
 }) {
+  const locale = useLocale();
   if (!isLoggedIn) {
     return (
       <Link
-        href="/auth/sign-in?redirect=/activities"
+        href={getSignInHref("/community/activities?category=checkin", locale)}
         className="flex aspect-square flex-col items-center justify-center rounded-xl text-center text-xs font-bold text-white shadow-lg"
-        style={{ background: "linear-gradient(135deg,#fbbf24,#f97316)" }}
+        style={{ background: "var(--color-brand)" }}
       >
         <span className="text-lg leading-none" aria-hidden>
           🔒
@@ -451,7 +466,7 @@ function DrawButton({
       className={`flex aspect-square flex-col items-center justify-center rounded-xl text-center font-bold text-white shadow-lg transition-transform ${
         canDraw ? "hover:scale-[1.05] active:scale-95" : "cursor-not-allowed opacity-70 grayscale"
       } ${spinning ? "animate-pulse" : ""}`}
-      style={{ background: "linear-gradient(135deg,#fbbf24,#f97316)" }}
+      style={{ background: "var(--color-brand)" }}
     >
       <span className="text-2xl leading-none" aria-hidden>
         {spinning ? "🎲" : "🎯"}
@@ -562,8 +577,8 @@ function PrizeOdds({
   return (
     <div className="flex min-w-0 flex-col">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm font-bold text-white">{t("oddsTitle")}</p>
-        <p className="font-mono text-[10px] text-white/50">{t("oddsLive")}</p>
+        <p className="text-sm font-bold text-ink">{t("oddsTitle")}</p>
+        <p className="font-mono text-[10px] text-muted">{t("oddsLive")}</p>
       </div>
 
       <div className="mt-3 flex flex-col gap-1.5">
@@ -577,20 +592,20 @@ function PrizeOdds({
           return (
             <div
               key={prize.id}
-              className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-white/10 px-3 py-2"
+              className="relative flex items-center gap-3 overflow-hidden rounded-xl bg-surface-2 px-3 py-2"
             >
               {/* 概率条铺在整行底下，比只写一个百分数更容易一眼比出大小 */}
               <span
                 aria-hidden
-                className="absolute inset-y-0 left-0 bg-amber-300/15"
+                className="absolute inset-y-0 left-0 bg-brand/5"
                 style={{ width: `${Math.min(100, chance)}%` }}
               />
               <span className={`relative text-xl leading-none ${soldOut ? "opacity-40 grayscale" : ""}`} aria-hidden>
                 {prize.icon}
               </span>
               <div className="relative min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-white">{prize.name || t("emptySlot")}</p>
-                <p className="font-mono text-[10px] text-white/50">
+                <p className="truncate text-xs font-semibold text-ink">{prize.name || t("emptySlot")}</p>
+                <p className="font-mono text-[10px] text-muted">
                   {prize.stock === null
                     ? t("unlimited")
                     : soldOut
@@ -601,7 +616,7 @@ function PrizeOdds({
                         })}
                 </p>
               </div>
-              <span className="relative shrink-0 font-mono text-xs font-bold text-amber-200">
+              <span className="relative shrink-0 font-mono text-xs font-bold text-brand-ink">
                 {chance > 0 ? `${chance.toFixed(1)}%` : "—"}
               </span>
             </div>
@@ -611,7 +626,7 @@ function PrizeOdds({
 
       {/* 规则性的文字都在 FAQ 里，这儿只留和"这一期"有关的信息：档期、每日上限。 */}
       {(settings.startsAt || settings.endsAt || settings.drawsPerDay > 0) && (
-        <div className="mt-3 flex flex-col gap-1 border-t border-white/15 pt-3 text-[11px] leading-5 text-white/60">
+        <div className="mt-3 flex flex-col gap-1 border-t border-line pt-3 text-[11px] leading-5 text-muted">
           {(settings.startsAt || settings.endsAt) && (
             <p>
               {t("windowRange", {

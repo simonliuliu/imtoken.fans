@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { getSignInHref } from "@/lib/auth-navigation";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { dailyCheckIn } from "@/app/actions/activities";
@@ -15,7 +16,9 @@ import type { CheckinState } from "@/lib/activity-types";
 // 格子用 auto-fit 的 grid 排：一行放得下就平分整行，放不下自动换行。
 // 这样周期天数被改成 5 天或 14 天都不会散架，也不用为每个天数写一套断点。
 
-export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLoggedIn: boolean }) {
+export function CheckinCard({ state, expectedUserId, onUpdated }: { state: CheckinState; expectedUserId: string | null; onUpdated: () => void }) {
+  const isLoggedIn = Boolean(expectedUserId);
+  const locale = useLocale();
   const t = useTranslations("checkin");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -25,6 +28,21 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
   const [done, setDone] = useState(state.checkedInToday);
   const [streak, setStreak] = useState(state.streak);
   const [flash, setFlash] = useState<number | null>(null);
+  const mountedRef = useRef(true);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; if (flashTimer.current) clearTimeout(flashTimer.current); };
+  }, []);
+  // A successful fresh read (including another tab or a new Beijing day) is
+  // authoritative even when local optimistic state still has the old values.
+  const [syncedState, setSyncedState] = useState(state);
+  if (syncedState !== state) {
+    setSyncedState(state);
+    setClaimed(state.claimedDayIndexes);
+    setDone(state.checkedInToday);
+    setStreak(state.streak);
+  }
 
   const { settings, todayDayIndex, todayReward } = state;
   const days = Array.from({ length: settings.cycleLength }, (_, i) => i + 1);
@@ -42,19 +60,23 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
   function handleCheckIn() {
     setError(null);
     startTransition(async () => {
-      const result = await dailyCheckIn();
+      if (!expectedUserId) return;
+      const result = await dailyCheckIn(expectedUserId);
+      if (!mountedRef.current) return;
       if (!result.ok) {
         setError(result.message);
         // "今天已经签到过了"说明本地状态过期了（比如在另一个标签页签过），直接同步过来。
         // 判断用服务端给的结构化标记，不去 match 提示文字——文案会跟着语言变。
-        if (result.alreadyCheckedIn) setDone(true);
+        if (result.alreadyCheckedIn) { setDone(true); onUpdated(); }
         return;
       }
       setDone(true);
       setStreak(result.streak);
       setClaimed((prev) => (prev.includes(result.dayIndex) ? prev : [...prev, result.dayIndex]));
       setFlash(result.xpAwarded);
-      setTimeout(() => setFlash(null), 1800);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlash(null), 1800);
+      onUpdated();
       router.refresh();
     });
   }
@@ -65,7 +87,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
       <div
         aria-hidden
         className="pointer-events-none absolute -left-24 -top-28 h-64 w-64 rounded-full opacity-[0.18] blur-3xl"
-        style={{ background: "radial-gradient(circle,#34d399,transparent 70%)" }}
+        style={{ background: "radial-gradient(circle,#e72b74,transparent 70%)" }}
       />
 
       <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -73,7 +95,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
           <h2 className="flex items-center gap-2 text-lg font-bold text-ink sm:text-xl">
             <span
               className="flex h-8 w-8 items-center justify-center rounded-xl text-base"
-              style={{ background: "linear-gradient(135deg,#34d399,#059669)" }}
+              style={{ background: "var(--color-brand-soft)" }}
               aria-hidden
             >
               📅
@@ -85,14 +107,14 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
         {/* 连续天数是签到最核心的那个数字，单独做成一枚勋章。 */}
         <div
           className="flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5"
-          style={{ background: "linear-gradient(135deg,#ecfdf5,#d1fae5)" }}
+          style={{ background: "var(--color-brand-soft)" }}
         >
           <span className="text-2xl leading-none" aria-hidden>
             {streak > 0 ? "🔥" : "🌱"}
           </span>
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-wide text-good/70">{t("streakLabel")}</p>
-            <p className="text-2xl font-extrabold leading-tight text-good">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-muted">{t("streakLabel")}</p>
+            <p className="text-2xl font-extrabold leading-tight text-brand-ink">
               {streak}
               <span className="ml-0.5 text-xs font-semibold">{t("streakUnit")}</span>
             </p>
@@ -117,7 +139,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
         <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-2">
           <div
             className="h-full rounded-full transition-[width] duration-500"
-            style={{ width: `${percent}%`, background: "linear-gradient(90deg,#34d399,#059669)" }}
+            style={{ width: `${percent}%`, background: "var(--color-brand)" }}
           />
         </div>
       </div>
@@ -138,7 +160,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
               key={day}
               className={`relative flex flex-col items-center gap-2 rounded-2xl border px-2 py-4 transition-all ${
                 isClaimed
-                  ? "border-good/25 bg-good-soft"
+                  ? "border-brand/25 bg-brand-soft"
                   : isToday
                     ? "checkin-today border-brand bg-brand-soft"
                     : isBig
@@ -167,7 +189,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
                 }`}
                 style={{
                   background: isClaimed
-                    ? "linear-gradient(135deg,#34d399,#059669)"
+                    ? "var(--color-brand)"
                     : isBig
                       ? "linear-gradient(135deg,#fbbf24,#d97706)"
                       : isToday
@@ -181,7 +203,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
 
               <span
                 className={`font-mono text-sm font-extrabold leading-none ${
-                  isClaimed ? "text-good" : isBig ? "text-warn" : isToday ? "text-brand-ink" : "text-muted"
+                  isClaimed ? "text-brand-ink" : isBig ? "text-warn" : isToday ? "text-brand-ink" : "text-muted"
                 }`}
               >
                 +{reward}
@@ -199,7 +221,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
       <div className="relative mt-6 flex flex-wrap items-center gap-3">
         {!isLoggedIn ? (
           <Link
-            href="/auth/sign-in?redirect=/activities"
+            href={getSignInHref("/community/activities?category=checkin", locale)}
             className="rounded-full bg-brand px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-ink"
           >
             {t("signInToCheckin")}
@@ -218,7 +240,7 @@ export function CheckinCard({ state, isLoggedIn }: { state: CheckinState; isLogg
             disabled={isPending}
             onClick={handleCheckIn}
             className="relative rounded-full px-8 py-3 text-sm font-bold text-white shadow-md transition-transform hover:scale-[1.03] active:scale-100 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ background: "linear-gradient(135deg,#34d399,#059669)" }}
+            style={{ background: "var(--color-brand)" }}
           >
             {isPending ? t("checkingIn") : t("checkinNow", { reward: todayReward })}
           </button>

@@ -18,7 +18,7 @@ const SORTS: SortMode[] = ["recommended", "latest", "popular"];
 const SPOTLIGHT_IDS = ["fake-support-message", "weekend-conversation", "ai-explainer"];
 function postHref(post: DemoPost) { return `/community/${post.section}/${post.id}`; }
 
-function SortTabs({ value, onChange }: { value: SortMode; onChange: (value: SortMode) => void }) {
+export function SortTabs({ value, onChange }: { value: SortMode; onChange: (value: SortMode) => void }) {
   const t = useTranslations("community");
   function handleKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -31,7 +31,7 @@ function SortTabs({ value, onChange }: { value: SortMode; onChange: (value: Sort
   return <div className="community-tabs" role="tablist" aria-label={t("sortLabel")}>{SORTS.map((sort, index) => <button type="button" role="tab" aria-selected={value === sort} tabIndex={value === sort ? 0 : -1} key={sort} onClick={() => onChange(sort)} onKeyDown={(event) => handleKey(event, index)}>{t(`sort.${sort}`)}</button>)}</div>;
 }
 
-function PostRow({ post }: { post: DemoPost }) {
+export function PostRow({ post }: { post: DemoPost }) {
   const t = useTranslations("community");
   const format = useFormatter();
   return <Link href={postHref(post)} className="community-post-row"><div className="community-post-main"><div className="community-post-author"><Avatar name={post.author} className={`community-avatar community-avatar-${post.author}`} /><span>{post.author}</span>{post.isExample ? <span className="community-demo-label">{t("realExample")}</span> : <LevelBadge level={post.level} size="xs" showIcon={false} />}<span className="community-post-location">· {t(`sections.${post.section}.name`)} › {t(`categories.${post.category}`)}</span></div><h2>{post.title ?? t(`posts.${post.id}.title`)}</h2><p className="community-post-excerpt">{post.excerpt ?? t(`posts.${post.id}.excerpt`)}</p><div className="community-post-meta"><time dateTime={post.createdAt}>{format.dateTime(new Date(post.createdAt), { month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time><span>{t("commentCount", { count: post.commentCount })}</span><span>{t("likeCount", { count: post.likes })}</span></div></div></Link>;

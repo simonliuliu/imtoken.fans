@@ -168,6 +168,7 @@ export function xpActionInfo(action: XpActionKey, locale: string): { label: stri
 // xp_events.action 里还有几种不由 xp_rules 控制的来源（签到奖励在签到设置里配，
 // 抽奖奖品在奖品列表里配，管理员手动调整没有规则），这里统一给个可读名字。
 const EXTRA_ACTION_LABEL: Record<string, string> = {
+  community_activity: "社区活动奖励",
   daily_checkin: "每日签到",
   lottery_prize: "抽奖中奖",
   lottery_cost: "抽奖消耗",
@@ -175,6 +176,7 @@ const EXTRA_ACTION_LABEL: Record<string, string> = {
 };
 
 const EXTRA_ACTION_LABEL_EN: Record<string, string> = {
+  community_activity: "Community activity reward",
   daily_checkin: "Daily check-in",
   lottery_prize: "Lottery prize",
   lottery_cost: "Lottery cost",

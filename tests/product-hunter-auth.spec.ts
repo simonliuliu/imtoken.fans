@@ -16,10 +16,12 @@ async function signIn(page: Page) {
 
 test("游客从旧点子链接进入社区登录后，只能提交产品", async ({ page }) => {
   await page.goto("/en/submit?type=idea");
+  await expect(page).toHaveURL(/\/en\/submit\/product$/);
+  await page.getByRole("link", { name: "Sign in to submit a product", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/auth\/sign-in\?/);
-  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/en/submit?type=product");
+  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/en/submit/product");
   await signIn(page);
-  await expect(page).toHaveURL(/\/en\/submit\?type=product$/);
+  await expect(page).toHaveURL(/\/en\/submit\/product$/);
   await expect(page.getByRole("heading", { name: "Submit a product", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Submit an idea/i })).toHaveCount(0);
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
@@ -34,7 +36,7 @@ test("已有社区会话，延迟加载期间不误显示登录或跳转", async
   await expect(page.getByRole("status").first()).toHaveText("加载中…");
   await expect(page.getByText("登录后才能提交", { exact: true })).toHaveCount(0);
   await expect(page.locator('a[href*="auth/sign-in"]')).toHaveCount(0);
-  expect(new URL(page.url()).pathname).toBe("/zh/submit");
+  expect(new URL(page.url()).pathname).toBe("/zh/submit/product");
   release();
   await expect(page.getByRole("heading", { name: "提交产品", exact: true })).toBeVisible();
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
@@ -74,9 +76,19 @@ test("新账号资料慢返回时，旧账号结果不能覆盖共享会话", as
     channel.postMessage({ event: "SIGNED_OUT", session: null });
     channel.close();
   });
-  await expect(page).toHaveURL(/\/zh\/auth\/sign-in\?/);
+  await expect(page).toHaveURL(/\/zh\/submit\/product$/);
+  await expect(page.locator('main a[href*="auth/sign-in"]')).toBeVisible();
+  const lateProfile = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/rest/v1/profiles" && url.searchParams.get("id") === `eq.${READER_ID}`;
+  });
   release();
-  await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
+  await (await lateProfile).finished();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const signInLink = page.locator('main a[href*="auth/sign-in"]');
+  await expect(signInLink).toBeVisible();
+  const href = await signInLink.getAttribute("href");
+  expect(new URL(href!, "http://127.0.0.1:3000").searchParams.get("redirect")).toBe("/zh/submit/product");
   await expect(page.getByText("Test Reader", { exact: true })).toHaveCount(0);
 });
 
