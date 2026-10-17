@@ -1,4 +1,18 @@
 {
+  "activityCenter": {
+    "productUnavailable": "指定产品已删除或不可访问，当前无法提交新的体验任务。历史参与和已发奖励保留。",
+    "reviewUnavailable": "关联体验评价已删除或失效。历史参与和已发奖励保留；尚未通过审核的提交无法据此发奖。",
+    "title": "活动", "home": "首页", "detail": "活动详情", "breadcrumb": "面包屑", "categories": "活动分类", "filters": "活动状态",
+    "category": { "all": "全部活动", "newcomer": "新手任务", "weekly": "每周挑战", "mine": "我的参与", "posts": "活动交流", "checkin": "签到抽奖" },
+    "type": { "event": "社区活动", "newcomer": "新手任务", "weekly": "每周挑战" },
+    "status": { "all": "全部状态", "active": "进行中", "upcoming": "即将开始", "ended": "已结束", "cancelled": "已取消" },
+    "participation": { "joined": "已参与", "submitted": "待审核", "approved": "已完成", "rejected": "需修正" },
+    "taskKind": { "checkin": "签到核验", "quiz": "安全知识小测", "manual": "社区贡献", "product_review": "产品体验评价" },
+    "loading": "正在加载活动…", "retry": "重试", "empty": "当前分类和状态下还没有已发布活动。", "mineEmpty": "还没有符合筛选的参与记录。", "notFound": "该活动尚未发布或不存在。", "mineGuest": "登录社区账号，查看你的参与、审核和奖励记录。", "signIn": "登录后参与",
+    "organizer": "主办方：{name}", "timeRange": "{start} — {end}（北京时间）", "xp": "{count} XP", "tickets": "{count} 张抽奖券", "badge": "徽章：{name}", "noReward": "无额外奖励", "limit": "奖励总名额 {count} 人 · 剩余 {remaining} 人", "unlimited": "奖励不设总人数上限。", "rewardRules": "参与不锁定奖励名额。按完成或审核通过的顺序发放，额度用尽即止；规则、奖励和时间在发布后固定。", "rules": "活动规则", "task": "活动任务", "cancelReason": "取消原因：{reason}。已发奖励不自动追回。",
+    "checkinTask": "完成活动期间的 {days} 天真实签到后核验，活动前的签到不计入。", "goCheckin": "前往签到", "reviewTask": "请在活动期间为指定产品创建自己的真实体验评价，再提交说明等待人工审核。评分高低不影响奖励资格。", "goProduct": "查看指定产品", "reviewNote": "审核说明：{note}", "myEvidence": "查看我的提交", "received": "到账记录：", "attempts": "已使用 {used} / {max} 次答题机会", "evidenceLabel": "贡献或体验说明", "sensitive": "仅提交 20–2000 字文字。请勿提供手机号、资产截图、助记词、私钥或密码；此处无需上传文件、连接钱包或交易。", "evidenceLength": "{count} / 2000 字（至少 20 字）", "resubmitRules": "提交后由管理员审核。被拒后可在活动结束前按审核说明修正并重新提交；结束后不再接收修改。", "saving": "处理中…", "verify": "核验签到并完成", "answer": "提交答案并完成", "submit": "提交审核", "join": "记录参与", "follow": "关注活动", "unfollow": "取消关注", "exhausted": "奖励名额已用尽，参与记录不代表获得奖励。", "notificationRules": "关注后在站内接收活动开始与取消消息；审核和到账消息保存在通知中心。在线时约每 30 秒检查，离站不保证实时送达。",
+    "errors": { "load": "暂时无法加载活动，请稍后重试；若持续失败，请联系管理员。", "session": "账号已变化，请刷新后重试。", "forbidden": "没有活动管理权限。", "invalid": "操作或活动配置无效。", "unavailable": "该活动当前不可参与。", "not_started": "活动还未开始。", "ended": "活动已结束。", "blocked": "当前账号暂不能参与活动。", "frozen": "活动发布后规则已冻结。", "not_joined": "请先参与活动。", "already_submitted": "已提交，正在等待审核。", "attempts_exhausted": "答题机会已用尽。", "evidence": "请输入 20–2000 字说明。", "checkin_missing": "活动期间的签到天数还未达标。", "review_missing": "未找到你在活动期间为指定产品创建的真实体验评价。", "reward_exhausted": "奖励名额已用尽。", "quiz_wrong": "答案未通过，请核对安全知识后重试。本次已计入答题次数。" }
+  },
   "common": {
     "loading": "加载中…",
     "cancel": "取消",
@@ -852,6 +866,10 @@
     "verifyFailed": "钱包验证失败"
   },
   "notifications": {
+    "activity_started": "你关注的活动「{title}」开始了。",
+    "activity_cancelled": "你关注的活动「{title}」已取消，请查看原因。",
+    "activity_approved": "「{title}」已完成，奖励记录已到账。",
+    "activity_rejected": "「{title}」的提交需修正，请查看审核说明。",
     "aria": "通知",
     "title": "通知",
     "empty": "暂时没有通知",
@@ -1004,6 +1022,7 @@
     "earnXp": "赚经验 →"
   },
   "errors": {
+    "sessionChanged": "账号已变化，请刷新后重试。",
     "notSignedIn": "请先登录",
     "blacklistedComment": "账号已被限制，无法发表评论",
     "blacklistedSubmit": "账号已被限制，无法提交",

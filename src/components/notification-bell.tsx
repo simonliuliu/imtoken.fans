@@ -13,6 +13,7 @@ import { AuthLoading } from "@/components/auth-loading";
 import { Avatar } from "@/components/avatar";
 import { LevelBadge } from "@/components/level-badge";
 import { levelTierName } from "@/lib/level";
+import { safeNotificationHref } from "@/lib/notification-navigation";
 
 type NotificationT = ReturnType<typeof useTranslations<"notifications">>;
 
@@ -33,6 +34,10 @@ function systemNotification(
   t: NotificationT,
   locale: string
 ): { icon: ReactNode; text: ReactNode; href: string } | null {
+  const kind = detail?.kind;
+  if (kind === "activity_started" || kind === "activity_cancelled" || kind === "activity_approved" || kind === "activity_rejected") {
+    return { icon: <SystemIcon emoji="📅" tone="brand" />, text: t(kind, { title: detail?.activity_title ?? "" }), href: `/community/activities/${detail?.activity_id ?? ""}` };
+  }
   switch (type) {
     case "level_up": {
       const level = detail?.level ?? 0;
@@ -313,10 +318,4 @@ function TrashIcon() {
       <path d="M14 11v6" />
     </svg>
   );
-}
-
-// Only routes produced by notification_read are accepted; no protocol or arbitrary URL.
-function safeNotificationHref(href?: string | null): string | null {
- if(!href)return null;
- return /^\/(?:products|ideas)\/[0-9a-f-]{36}(?:#comment-[0-9a-f-]{36})?$/.test(href)||/^\/community\/feedback\?category=wallet&idea=[0-9a-f-]{36}(?:&commentOffset=[0-9]+)?(?:#comment-[0-9a-f-]{36})?$/.test(href)?href:null;
 }

@@ -19,7 +19,7 @@ export default defineConfig({
       url: "http://127.0.0.1:3000",
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54329", NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-test-public-key", NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3000" },
+      env: { NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54329", NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-test-public-key", SUPABASE_SERVICE_ROLE_KEY: "local-test-service-key", NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3000" },
     },
   ],
 });

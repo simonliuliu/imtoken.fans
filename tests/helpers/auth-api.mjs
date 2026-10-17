@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { CREATOR_ID, READER_ID, product, profileFor, sessionFor, userFor } from "./auth-fixtures.mjs";
+import { handleActivityApi } from "./activity-api.mjs";
 
 function readViewer(request) {
   try {
@@ -28,6 +29,7 @@ const server = createServer(async (request, response) => {
     return send({ ok: true });
   }
   const viewer = readViewer(request);
+  if (await handleActivityApi(request, url, viewer, send)) return;
   if (url.pathname === "/auth/v1/user") return viewer ? send(userFor(viewer)) : send({ message: "No test session" }, 401);
   if (url.pathname === "/auth/v1/logout") return send({});
   if (url.pathname === "/auth/v1/token") {

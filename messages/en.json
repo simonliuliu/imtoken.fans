@@ -1,4 +1,18 @@
 {
+  "activityCenter": {
+    "productUnavailable": "The specified product was removed or is unavailable. New experience submissions are closed. Participation history and issued rewards are retained.",
+    "reviewUnavailable": "The linked experience review was removed or is unavailable. Participation history and issued rewards are retained; pending submissions cannot receive rewards using this review.",
+    "title": "Activities", "home": "Home", "detail": "Activity details", "breadcrumb": "Breadcrumb", "categories": "Activity categories", "filters": "Activity status",
+    "category": { "all": "All activities", "newcomer": "Newcomer tasks", "weekly": "Weekly challenges", "mine": "My participation", "posts": "Community posts", "checkin": "Check-in & lottery" },
+    "type": { "event": "Community event", "newcomer": "Newcomer task", "weekly": "Weekly challenge" },
+    "status": { "all": "All statuses", "active": "Active", "upcoming": "Upcoming", "ended": "Ended", "cancelled": "Cancelled" },
+    "participation": { "joined": "Joined", "submitted": "Awaiting review", "approved": "Completed", "rejected": "Needs correction" },
+    "taskKind": { "checkin": "Verify check-ins", "quiz": "Safety knowledge quiz", "manual": "Community contribution", "product_review": "Product experience review" },
+    "loading": "Loading activities…", "retry": "Retry", "empty": "No published activities match this category and status yet.", "mineEmpty": "No participation records match this filter yet.", "notFound": "This activity is unpublished or does not exist.", "mineGuest": "Sign in with your community account to see your participation, reviews and rewards.", "signIn": "Sign in to participate",
+    "organizer": "Organized by {name}", "timeRange": "{start} — {end} (Beijing time)", "xp": "{count} XP", "tickets": "{count} lottery tickets", "badge": "Badge: {name}", "noReward": "No additional reward", "limit": "Reward limit: {count} people · {remaining} remaining", "unlimited": "No overall recipient limit.", "rewardRules": "Participation does not reserve a reward. Rewards follow completion or approval order while available. Rules, rewards and dates are fixed at publication.", "rules": "Activity rules", "task": "Activity task", "cancelReason": "Cancellation reason: {reason}. Issued rewards are not automatically reclaimed.",
+    "checkinTask": "Verify after completing {days} days of real check-ins during this activity. Earlier check-ins do not count.", "goCheckin": "Go to check-in", "reviewTask": "Create your own honest experience review for the specified product during the activity, then submit a note for manual review. Rating higher does not improve reward eligibility.", "goProduct": "View specified product", "reviewNote": "Review note: {note}", "myEvidence": "View my submission", "received": "Reward receipt:", "attempts": "{used} of {max} attempts used", "evidenceLabel": "Contribution or experience note", "sensitive": "Submit 20–2000 characters of text only. Do not share phone numbers, asset screenshots, seed phrases, private keys or passwords. No upload, wallet connection or transaction is needed.", "evidenceLength": "{count} / 2000 characters (minimum 20)", "resubmitRules": "Submissions require administrator review. If rejected, correct your note and resubmit before the activity ends. Changes are closed after the end time.", "saving": "Processing…", "verify": "Verify check-ins and complete", "answer": "Submit answer and complete", "submit": "Submit for review", "join": "Record participation", "follow": "Follow activity", "unfollow": "Unfollow", "exhausted": "All rewards have been allocated. Participation does not guarantee a reward.", "notificationRules": "Follow to receive start and cancellation notices in the notification center, alongside review and reward receipts. The site checks about every 30 seconds while open; delivery while away is not guaranteed.",
+    "errors": { "load": "Activities are temporarily unavailable. Please retry later, or contact an administrator if this continues.", "session": "Your account changed. Refresh and try again.", "forbidden": "You do not have activity management permission.", "invalid": "Invalid operation or activity configuration.", "unavailable": "This activity is not available for participation.", "not_started": "This activity has not started.", "ended": "This activity has ended.", "blocked": "This account cannot participate at present.", "frozen": "Rules are frozen after publication.", "not_joined": "Join the activity first.", "already_submitted": "Your submission is awaiting review.", "attempts_exhausted": "All quiz attempts have been used.", "evidence": "Enter a note of 20–2000 characters.", "checkin_missing": "You have not completed enough check-ins during the activity.", "review_missing": "No eligible experience review by you for this product was found within the activity dates.", "reward_exhausted": "All reward places have been allocated.", "quiz_wrong": "The answer did not pass. Check the safety guidance and try again. This attempt has been counted." }
+  },
   "common": {
     "loading": "Loading…",
     "cancel": "Cancel",
@@ -852,6 +866,10 @@
     "verifyFailed": "Wallet verification failed"
   },
   "notifications": {
+    "activity_started": "The activity you follow, “{title}”, has started.",
+    "activity_cancelled": "The activity you follow, “{title}”, was cancelled. See the reason.",
+    "activity_approved": "“{title}” is complete. Its reward receipt is available.",
+    "activity_rejected": "Your submission for “{title}” needs correction. See the review note.",
     "aria": "Notifications",
     "title": "Notifications",
     "empty": "No notifications yet",
@@ -1004,6 +1022,7 @@
     "earnXp": "Earn XP →"
   },
   "errors": {
+    "sessionChanged": "Your account changed. Refresh and try again.",
     "notSignedIn": "Please sign in first",
     "blacklistedComment": "This account is restricted and can't comment",
     "blacklistedSubmit": "This account is restricted and can't submit",

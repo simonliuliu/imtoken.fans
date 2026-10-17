@@ -62,7 +62,7 @@ interface RawCheckinRow {
   new_level: number;
 }
 
-export async function dailyCheckIn(): Promise<CheckinResult> {
+export async function dailyCheckIn(expectedUserId: string): Promise<CheckinResult> {
   const t = await getTranslations("errors");
   const fail = (message: string, alreadyCheckedIn = false): CheckinResult => ({
     ok: false,
@@ -78,6 +78,7 @@ export async function dailyCheckIn(): Promise<CheckinResult> {
 
   const profile = await getCurrentProfile();
   if (!profile) return fail(t("notSignedIn"));
+  if (profile.id !== expectedUserId) return fail(t("sessionChanged"));
   if (await isBlacklisted(profile.id)) return fail(t("blacklistedActivity"));
 
   const admin = createAdminClient();
@@ -98,6 +99,7 @@ export async function dailyCheckIn(): Promise<CheckinResult> {
   if (leveledUp) await createLevelUpNotification(profile.id, row.new_level);
 
   revalidatePath("/activities");
+  revalidatePath("/community/activities");
   revalidatePath("/profile");
 
   return {
@@ -149,7 +151,7 @@ interface RawLotteryRow {
   draws_left: number;
 }
 
-export async function drawLottery(): Promise<LotteryResult> {
+export async function drawLottery(expectedUserId: string): Promise<LotteryResult> {
   const t = await getTranslations("errors");
   // 数据库函数用 -1 表示"没设每日上限"，到了 TS 这层统一成 null，前端就不用记这个约定。
   const normalizeDrawsLeft = (value: number | null | undefined): number | null =>
@@ -173,6 +175,7 @@ export async function drawLottery(): Promise<LotteryResult> {
 
   const profile = await getCurrentProfile();
   if (!profile) return fail(t("notSignedIn"));
+  if (profile.id !== expectedUserId) return fail(t("sessionChanged"));
   if (await isBlacklisted(profile.id)) return fail(t("blacklistedActivity"));
 
   const admin = createAdminClient();
@@ -204,6 +207,7 @@ export async function drawLottery(): Promise<LotteryResult> {
   if (row.prize_kind === "badge") await notifyLotteryBadge(profile.id, row.prize_id);
 
   revalidatePath("/activities");
+  revalidatePath("/community/activities");
   revalidatePath("/profile");
 
   return {

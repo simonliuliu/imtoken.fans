@@ -2,13 +2,14 @@
 export const READER_ID = "11111111-1111-4111-8111-111111111111";
 export const CREATOR_ID = "22222222-2222-4222-8222-222222222222";
 export const PRODUCT_ID = "33333333-3333-4333-8333-333333333333";
+export const ADMIN_ID = "88888888-8888-4888-8888-888888888888";
 
 export function userFor(id = READER_ID) {
   return {
     id, aud: "authenticated", role: "authenticated",
     email: id === CREATOR_ID ? "creator@example.test" : "reader@example.test",
     app_metadata: { provider: "email", providers: ["email"] },
-    user_metadata: { username: id === CREATOR_ID ? "test_creator" : "test_reader" },
+    user_metadata: { username: id === ADMIN_ID ? "test_admin" : id === CREATOR_ID ? "test_creator" : "test_reader" },
     created_at: "2026-01-01T00:00:00Z",
   };
 }
@@ -22,9 +23,9 @@ export function sessionFor(id = READER_ID) {
 
 export function profileFor(id = READER_ID) {
   return {
-    id, username: id === CREATOR_ID ? "test_creator" : "test_reader",
-    display_name: id === CREATOR_ID ? "Test Creator" : "Test Reader",
-    role: "user", permissions: {}, avatar_url: null, bio: null, expertise: [],
+    id, username: id === ADMIN_ID ? "test_admin" : id === CREATOR_ID ? "test_creator" : "test_reader",
+    display_name: id === ADMIN_ID ? "Test Admin" : id === CREATOR_ID ? "Test Creator" : "Test Reader",
+    role: id === ADMIN_ID ? "admin" : "user", permissions: {}, avatar_url: null, bio: null, expertise: [],
     xp: 0, level: 0, onboarded_at: "2026-01-01T00:00:00Z",
     submission_cooldown_until: null, muted_until: null,
   };
