@@ -1,0 +1,17 @@
+{
+  "projectId": "prj_pktAabCzDuQzYTAnEyeLqGHmFwGx",
+  "name": "imtoken-fans-roadshow",
+  "deploymentId": "dpl_9HVeikcrkJgs42rAKDEsGEta9YMH",
+  "sourceCommit": "e8814d73c6b5c5d381ad95bee21ec80a34d906b3",
+  "sourceHtmlSha256": "6402531f9f1459517a92b2ae30bd98a5362a71a2e49550e6d93b0877fc5b1cbf",
+  "publicUrl": "https://imtoken-fans-roadshow.vercel.app/",
+  "immutableUrl": "https://imtoken-fans-roadshow-5qflaeprt-simonliulius-projects.vercel.app",
+  "readyState": "READY",
+  "deployedFiles": [
+    "imTokenFans-roadshow.html",
+    "vercel.json"
+  ],
+  "rootEntry": "index.html is an alias of the same uploaded HTML bytes",
+  "verifiedAt": "2026-10-17",
+  "httpStatus": 200
+}
