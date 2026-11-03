@@ -1,5 +1,8 @@
 import { createServer } from "node:http";
 import { CREATOR_ID, READER_ID, product, profileFor, sessionFor, userFor } from "./auth-fixtures.mjs";
+import { createNotificationFixtures } from "./notification-fixtures.mjs";
+
+const notificationFixtures = process.env.FORUM_NOTIFICATION_FIXTURES === "1" ? createNotificationFixtures() : null;
 
 function readViewer(request) {
   try {
@@ -11,7 +14,8 @@ function readViewer(request) {
 let omitServerProfiles = false;
 let failProductList = false;
 const server = createServer(async (request, response) => {
-  response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:3000");
+  const origin = notificationFixtures && request.headers.origin === "http://localhost:3000" ? "http://localhost:3000" : "http://127.0.0.1:3000";
+  response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Access-Control-Allow-Headers", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
   response.setHeader("Content-Type", "application/json");
@@ -28,6 +32,7 @@ const server = createServer(async (request, response) => {
     return send({ ok: true });
   }
   const viewer = readViewer(request);
+  if (notificationFixtures && await notificationFixtures.handle({ request, url, viewer, send })) return;
   if (url.pathname === "/auth/v1/user") return viewer ? send(userFor(viewer)) : send({ message: "No test session" }, 401);
   if (url.pathname === "/auth/v1/logout") return send({});
   if (url.pathname === "/auth/v1/token") {
