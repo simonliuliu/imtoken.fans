@@ -52,6 +52,8 @@
 - ADM-01 / USR-02：后台内容列表的 `setSubmissionStatus` 只更新投稿状态并写日志，没有同步处理该投稿仍为 pending 的审核队列，也没有为产品投稿执行发布经验更新。以虚构数据在完整 0001–0030 迁移基线的隔离 PostgreSQL 中，分别对待审产品和社区帖执行该动作等价的状态更新：两者变为 published 后审核队列仍为 pending；产品没有 `submission_product` 经验事件，社区帖由 0030 触发器正常产生 `submission_post` 事件。源码中审核队列列表按队列状态读取且不筛选投稿当前状态，旧记录因此可能再次出现在待审列表。
 - 这次是源码与隔离数据复现，未检查当前线上数据或声称真实用户已经受到影响。后续修复须同时处理权限、队列与内容状态一致性、产品和帖子经验幂等、并发审核及历史记录，不静默改写存量；先完成论坛反馈既有批次，依赖就绪后按风险独立 QA。现场数据库管理登录缺失是相关迁移和正式验收的共同前置条件。
 
+后续进展：等待管理登录期间，已在独立工作目录 `/Users/simonliu/.codex/worktrees/forum-moderation-consistency/imtoken.fans` 和分支 `codex/forum-moderation-consistency` 实现上述修复，建立 [草稿 PR #42](https://github.com/simonliuliu/imtoken.fans/pull/42)。隔离数据库、Action、权限及独立 QA 已完成；真实迁移和发布仍待管理会话，先接续论坛反馈 PR #41，不重复创建审核修复任务。
+
 ## 后续队列与自动处理约定
 
 1. 完成本批通知跳转和用户故事基线，通过必要检查后自动合并发布，用户在线上 review。
