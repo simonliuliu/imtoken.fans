@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -235,29 +236,67 @@ export function CommentItem({
   const [deletedReplyIds, setDeletedReplyIds] = useState<Set<string>>(() => new Set());
   const [collapsed, setCollapsed] = useState(false);
   const [page, setPage] = useState(1);
+  const handledHashRef = useRef<string | null>(null);
+  const revealFramesRef = useRef<{ reveal: number | null; scroll: number | null }>({ reveal: null, scroll: null });
+  const cancelPendingReveal = useCallback(() => {
+    const frames = revealFramesRef.current;
+    if (frames.reveal !== null) cancelAnimationFrame(frames.reveal);
+    if (frames.scroll !== null) cancelAnimationFrame(frames.scroll);
+    frames.reveal = null;
+    frames.scroll = null;
+  }, []);
+  const visibleReplies = replies.filter((reply) => !deletedReplyIds.has(reply.id));
+  const totalPages = Math.max(1, Math.ceil(visibleReplies.length / REPLIES_PER_PAGE));
+  const displayedPage = Math.min(page, totalPages);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      // Keep the selected page in sync when the final reply on it disappears.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   useEffect(() => {
     const reveal = () => {
-      const target = window.location.hash.replace(/^#comment-/, "");
-      const index = replies.findIndex(reply => reply.id === target);
+      cancelPendingReveal();
+      const hash = window.location.hash;
+      if (!hash.startsWith("#comment-") || handledHashRef.current === hash) return;
+      const target = hash.slice("#comment-".length);
+      const index = replies.filter(reply => !deletedReplyIds.has(reply.id)).findIndex(reply => reply.id === target);
       if (index < 0) return;
-      requestAnimationFrame(() => {
+      revealFramesRef.current.reveal = requestAnimationFrame(() => {
+        revealFramesRef.current.reveal = null;
+        if (window.location.hash !== hash) return;
         setCollapsed(false);
         setPage(Math.floor(index / REPLIES_PER_PAGE) + 1);
-        requestAnimationFrame(() => document.getElementById(`comment-${target}`)?.scrollIntoView({ block: "center" }));
+        revealFramesRef.current.scroll = requestAnimationFrame(() => {
+          revealFramesRef.current.scroll = null;
+          if (window.location.hash !== hash) return;
+          const element = document.getElementById(`comment-${target}`);
+          if (!element) return;
+          handledHashRef.current = hash;
+          element.scrollIntoView({ block: "center" });
+        });
       });
     };
+    const onHashChange = () => {
+      handledHashRef.current = null;
+      reveal();
+    };
     reveal();
-    window.addEventListener("hashchange", reveal);
-    return () => window.removeEventListener("hashchange", reveal);
-  }, [replies]);
+    window.addEventListener("hashchange", onHashChange);
+    return () => {
+      cancelPendingReveal();
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, [replies, deletedReplyIds, cancelPendingReveal]);
 
 
   if (deleted) return null;
 
-  const visibleReplies = replies.filter((r) => !deletedReplyIds.has(r.id));
   const hasReplies = visibleReplies.length > 0;
-  const totalPages = Math.max(1, Math.ceil(visibleReplies.length / REPLIES_PER_PAGE));
-  const pagedReplies = visibleReplies.slice((page - 1) * REPLIES_PER_PAGE, page * REPLIES_PER_PAGE);
+  const pagedReplies = visibleReplies.slice((displayedPage - 1) * REPLIES_PER_PAGE, displayedPage * REPLIES_PER_PAGE);
   // 竖线要一路贯穿到回复区，所以只要有回复（且没收起）就得画，回复表单本身也挂在这条线上。
   const showRail = hasReplies || replyTo !== null;
 
@@ -281,7 +320,11 @@ export function CommentItem({
               {hasReplies && (
                 <button
                   type="button"
-                  onClick={() => setCollapsed((v) => !v)}
+                  onClick={() => {
+                    handledHashRef.current = window.location.hash;
+                    cancelPendingReveal();
+                    setCollapsed((v) => !v);
+                  }}
                   aria-label={collapsed ? t("expandReplies") : t("collapseReplies")}
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-muted transition-colors hover:border-brand hover:text-brand-ink"
                 >
@@ -305,6 +348,8 @@ export function CommentItem({
               initialBody={replyTo ? `@${replyTo} ` : ""}
               autoFocus
               onPosted={(newComment) => {
+                handledHashRef.current = window.location.hash;
+                cancelPendingReveal();
                 setReplyTo(null);
                 setCollapsed(false);
                 setPage(Math.ceil((visibleReplies.length + 1) / REPLIES_PER_PAGE));
@@ -341,7 +386,11 @@ export function CommentItem({
           })}
           {totalPages > 1 && (
             <div className="pl-9">
-              <ReplyPagination page={page} totalPages={totalPages} onChange={setPage} />
+              <ReplyPagination page={displayedPage} totalPages={totalPages} onChange={(nextPage) => {
+                handledHashRef.current = window.location.hash;
+                cancelPendingReveal();
+                setPage(nextPage);
+              }} />
             </div>
           )}
         </div>
