@@ -60,9 +60,11 @@ if (!scenario) {
       assert.equal((await db.query('select count(*)::integer value from forum_feedback_jobs')).rows[0].value, 0);
       const read = await db.query("select feedback_read(null,'','forum','all','latest',0,0) value");
       assert.equal(read.rows[0].value.total, 0);
-      const contract = await db.query("select has_function_privilege('service_role','public.forum_feedback_jobs_list(integer,integer,boolean)','execute') as worker,has_function_privilege('authenticated','public.forum_feedback_jobs_list(integer,integer,boolean)','execute') as client");
+      const contract = await db.query("select has_function_privilege('service_role','public.forum_feedback_jobs_list(integer,integer,boolean)','execute') as worker,has_function_privilege('authenticated','public.forum_feedback_jobs_list(integer,integer,boolean)','execute') as client,has_function_privilege('service_role','public.forum_feedback_jobs_renew(uuid,uuid,integer,jsonb)','execute') as renew_worker,has_function_privilege('authenticated','public.forum_feedback_jobs_renew(uuid,uuid,integer,jsonb)','execute') as renew_client");
       assert.equal(contract.rows[0].worker, true);
       assert.equal(contract.rows[0].client, false);
+      assert.equal(contract.rows[0].renew_worker, true);
+      assert.equal(contract.rows[0].renew_client, false);
       await assert.rejects(() => db.exec(sql), /forum_deploy_0032_already_or_partially_installed/);
       await db.exec('rollback');
       assert.equal((await db.query('select count(*)::integer value from feedback_posts where id=$1', [id])).rows[0].value, 1);

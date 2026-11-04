@@ -203,6 +203,8 @@ create table public.forum_feedback_jobs (
  snapshot jsonb not null,
  status text not null default 'queued' check(status in ('queued','claimed','pr_ready','deployed','blocked','stale')),
  attempts integer not null default 0 check(attempts>=0),
+ lease_reclaims integer not null default 0 check(lease_reclaims>=0),
+ consecutive_expirations integer not null default 0 check(consecutive_expirations>=0),
  available_at timestamptz not null default now(),
  claimed_by text, lease_token uuid, lease_until timestamptz,
  task_key text check(char_length(task_key)<=200),
@@ -267,11 +269,16 @@ create function public.forum_feedback_jobs_list(p_limit integer default 20,p_off
 language plpgsql stable security definer set search_path=public,pg_temp as $$
 begin
  if p_limit is null or p_limit not between 1 and 100 or p_offset is null or p_offset not between 0 and 100000 or p_history is null then raise exception 'forum_queue_invalid'; end if;
- return (select coalesce(jsonb_agg(item order by created_at,id),'[]') from (
-  select id,created_at,(to_jsonb(j)-'lease_token')||jsonb_build_object('source_current',forum_feedback_source_current(feedback_id,current_version)) item
-  from forum_feedback_jobs j where p_history or (attempts<5 or status='pr_ready' or status='claimed' and pr_url is not null and lease_until<now()) and forum_feedback_source_current(feedback_id,current_version)
+ return (select coalesce(jsonb_agg(item order by needs_attention,created_at,id),'[]') from (
+  select id,created_at,
+   case when p_history then false else (attempts>=5 or consecutive_expirations>=5) and status<>'pr_ready' end needs_attention,
+   (to_jsonb(j)-'lease_token')||jsonb_build_object(
+    'source_current',forum_feedback_source_current(feedback_id,current_version),
+    'requires_attention',(attempts>=5 or consecutive_expirations>=5) and status<>'pr_ready',
+    'requires_resume',(status in ('queued','blocked','pr_ready') or status='claimed' and lease_until<now()) and (task_key is not null or pr_url is not null)) item
+  from forum_feedback_jobs j where p_history or forum_feedback_source_current(feedback_id,current_version)
    and (status in ('queued','blocked') and available_at<=now() or status='claimed' and lease_until<now() or status='pr_ready')
-  order by created_at,id limit p_limit offset p_offset
+  order by needs_attention,created_at,id limit p_limit offset p_offset
  ) listed);
 end; $$;
 
@@ -281,13 +288,13 @@ declare selected public.forum_feedback_jobs; source_id uuid;
 begin
  if p_worker is null or char_length(trim(p_worker)) not between 1 and 120 or p_lease_seconds is null or p_lease_seconds not between 60 and 3600 then raise exception 'forum_queue_invalid'; end if;
  select p.id into source_id from feedback_posts p where exists(
-  select 1 from forum_feedback_jobs j where j.feedback_id=p.id and (p_id is null or j.id=p_id) and (j.attempts<5 or p_id is not null and j.pr_url is not null and (j.status='pr_ready' or j.status='claimed' and j.lease_until<now())) and j.available_at<=now()
-  and (j.status in ('queued','blocked') or j.status='claimed' and j.lease_until<now() or p_id is not null and j.status='pr_ready')
+  select 1 from forum_feedback_jobs j where j.feedback_id=p.id and (p_id is null or j.id=p_id) and (j.attempts<5 and j.consecutive_expirations<5 or p_id is not null) and j.available_at<=now()
+  and (j.status in ('queued','blocked') and (p_id is not null or j.task_key is null and j.pr_url is null) or j.status='claimed' and j.lease_until<now() and (p_id is not null or j.task_key is null and j.pr_url is null) or p_id is not null and j.status='pr_ready')
   and forum_feedback_source_current(j.feedback_id,j.current_version)) order by p.created_at,p.id for share of p skip locked limit 1;
  if not found then return null; end if;
  select * into selected from forum_feedback_jobs j
-  where feedback_id=source_id and (p_id is null or j.id=p_id) and (attempts<5 or p_id is not null and pr_url is not null and (status='pr_ready' or status='claimed' and lease_until<now())) and available_at<=now()
-  and (status in ('queued','blocked') or status='claimed' and lease_until<now() or p_id is not null and status='pr_ready')
+  where feedback_id=source_id and (p_id is null or j.id=p_id) and (attempts<5 and consecutive_expirations<5 or p_id is not null) and available_at<=now()
+  and (status in ('queued','blocked') and (p_id is not null or task_key is null and pr_url is null) or status='claimed' and lease_until<now() and (p_id is not null or task_key is null and pr_url is null) or p_id is not null and status='pr_ready')
   and forum_feedback_source_current(feedback_id,current_version)
   order by created_at,id for update skip locked limit 1;
  if not found then return null; end if;
@@ -295,24 +302,51 @@ begin
  -- precedes this check or invalidates the lease through the enqueue trigger.
  perform 1 from feedback_posts where id=selected.feedback_id for share;
  if not forum_feedback_source_current(selected.feedback_id,selected.current_version) then return null; end if;
- update forum_feedback_jobs set status='claimed',attempts=attempts+case when selected.status='pr_ready' or selected.status='claimed' and selected.pr_url is not null then 0 else 1 end,claimed_by=trim(p_worker),lease_token=gen_random_uuid(),lease_until=now()+make_interval(secs=>p_lease_seconds),updated_at=now()
+ update forum_feedback_jobs set status='claimed',
+  attempts=attempts+case when selected.status in ('queued','blocked') then 1 else 0 end,
+  lease_reclaims=lease_reclaims+case when selected.status='claimed' then 1 else 0 end,
+  consecutive_expirations=case when selected.status='claimed' then consecutive_expirations+1 when selected.status in ('queued','blocked') then 0 else consecutive_expirations end,
+  claimed_by=trim(p_worker),lease_token=gen_random_uuid(),lease_until=clock_timestamp()+make_interval(secs=>p_lease_seconds),updated_at=now()
   where id=selected.id returning * into selected;
  return to_jsonb(selected);
+end; $$;
+
+-- A checkpoint keeps a live lease while recording durable, immutable task links.
+create function public.forum_feedback_jobs_renew(p_id uuid,p_token uuid,p_lease_seconds integer default 3600,p_metadata jsonb default '{}') returns jsonb
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare selected public.forum_feedback_jobs;
+begin
+ if p_id is null or p_token is null or p_lease_seconds is null or p_lease_seconds not between 60 and 3600 or jsonb_typeof(p_metadata) is distinct from 'object'
+ or exists(select 1 from jsonb_each(p_metadata) e where e.key not in ('task_key','pr_url') or jsonb_typeof(e.value)<>'string' or length(trim(e.value#>>'{}'))=0) then raise exception 'forum_queue_invalid'; end if;
+ select * into selected from forum_feedback_jobs where id=p_id;
+ if not found then raise exception 'forum_queue_lease'; end if;
+ perform 1 from feedback_posts where id=selected.feedback_id for share;
+ select * into selected from forum_feedback_jobs where id=p_id for update;
+ if not found or selected.status<>'claimed' or selected.lease_token is distinct from p_token or selected.lease_until<=clock_timestamp() then raise exception 'forum_queue_lease'; end if;
+ if not forum_feedback_source_current(selected.feedback_id,selected.current_version) then raise exception 'forum_queue_stale'; end if;
+ if (p_metadata ? 'task_key' and selected.task_key is not null and selected.task_key<>(p_metadata->>'task_key'))
+ or (p_metadata ? 'pr_url' and selected.pr_url is not null and selected.pr_url<>(p_metadata->>'pr_url')) then raise exception 'forum_queue_association_conflict'; end if;
+ update forum_feedback_jobs set task_key=coalesce(p_metadata->>'task_key',task_key),pr_url=coalesce(p_metadata->>'pr_url',pr_url),
+  lease_until=greatest(lease_until,clock_timestamp()+make_interval(secs=>p_lease_seconds)),consecutive_expirations=0,updated_at=now()
+  where id=p_id returning * into selected;
+ return to_jsonb(selected)-'lease_token'-'snapshot';
 end; $$;
 
 create function public.forum_feedback_jobs_record(p_id uuid,p_token uuid,p_status text,p_metadata jsonb default '{}') returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare selected public.forum_feedback_jobs;
 begin
- if p_status is null or p_status not in ('pr_ready','deployed','blocked') or jsonb_typeof(p_metadata) is distinct from 'object'
- or exists(select 1 from jsonb_each(p_metadata) e where e.key not in ('task_key','pr_url','commit_sha','deployment_id','deployment_url','failure_reason') or jsonb_typeof(e.value)<>'string') then raise exception 'forum_queue_invalid'; end if;
+ if p_id is null or p_token is null or p_status is null or p_status not in ('pr_ready','deployed','blocked') or jsonb_typeof(p_metadata) is distinct from 'object'
+ or exists(select 1 from jsonb_each(p_metadata) e where e.key not in ('task_key','pr_url','commit_sha','deployment_id','deployment_url','failure_reason') or jsonb_typeof(e.value)<>'string' or e.key in ('task_key','pr_url') and length(trim(e.value#>>'{}'))=0) then raise exception 'forum_queue_invalid'; end if;
  select * into selected from forum_feedback_jobs where id=p_id;
  if not found then raise exception 'forum_queue_lease'; end if;
  perform 1 from feedback_posts where id=selected.feedback_id for share;
  select * into selected from forum_feedback_jobs where id=p_id for update;
- if not found or selected.status<>'claimed' or selected.lease_token is distinct from p_token or selected.lease_until<=now() then raise exception 'forum_queue_lease'; end if;
+ if not found or selected.status<>'claimed' or selected.lease_token is distinct from p_token or selected.lease_until<=clock_timestamp() then raise exception 'forum_queue_lease'; end if;
  perform 1 from feedback_posts where id=selected.feedback_id for share;
  if not forum_feedback_source_current(selected.feedback_id,selected.current_version) then raise exception 'forum_queue_stale'; end if;
+ if (p_metadata ? 'task_key' and selected.task_key is not null and selected.task_key<>(p_metadata->>'task_key'))
+ or (p_metadata ? 'pr_url' and selected.pr_url is not null and selected.pr_url<>(p_metadata->>'pr_url')) then raise exception 'forum_queue_association_conflict'; end if;
  if p_status in ('pr_ready','deployed') and coalesce(p_metadata->>'pr_url',selected.pr_url) is null then raise exception 'forum_queue_evidence'; end if;
  if p_status='deployed' and (coalesce(p_metadata->>'commit_sha',selected.commit_sha) is null or coalesce(p_metadata->>'deployment_id',selected.deployment_id) is null or coalesce(p_metadata->>'deployment_url',selected.deployment_url) is null) then raise exception 'forum_queue_evidence'; end if;
  update forum_feedback_jobs set status=p_status,task_key=coalesce(p_metadata->>'task_key',task_key),pr_url=coalesce(p_metadata->>'pr_url',pr_url),commit_sha=coalesce(p_metadata->>'commit_sha',commit_sha),deployment_id=coalesce(p_metadata->>'deployment_id',deployment_id),deployment_url=coalesce(p_metadata->>'deployment_url',deployment_url),failure_reason=case when p_status='blocked' then p_metadata->>'failure_reason' else null end,
@@ -322,7 +356,7 @@ begin
  -- production evidence before recording deployed; this RPC never publishes code.
  return to_jsonb(selected)-'lease_token';
 end; $$;
-revoke all on function public.forum_feedback_jobs_list(integer,integer,boolean),public.forum_feedback_jobs_claim(text,uuid,integer),public.forum_feedback_jobs_record(uuid,uuid,text,jsonb) from public,anon,authenticated,service_role;
-grant execute on function public.forum_feedback_jobs_list(integer,integer,boolean),public.forum_feedback_jobs_claim(text,uuid,integer),public.forum_feedback_jobs_record(uuid,uuid,text,jsonb) to service_role;
+revoke all on function public.forum_feedback_jobs_list(integer,integer,boolean),public.forum_feedback_jobs_claim(text,uuid,integer),public.forum_feedback_jobs_renew(uuid,uuid,integer,jsonb),public.forum_feedback_jobs_record(uuid,uuid,text,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.forum_feedback_jobs_list(integer,integer,boolean),public.forum_feedback_jobs_claim(text,uuid,integer),public.forum_feedback_jobs_renew(uuid,uuid,integer,jsonb),public.forum_feedback_jobs_record(uuid,uuid,text,jsonb) to service_role;
 -- Existing public feedback RPC ACLs are retained by CREATE OR REPLACE.
 commit;

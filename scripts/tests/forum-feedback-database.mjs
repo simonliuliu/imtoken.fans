@@ -67,12 +67,14 @@ await check('private table and operator RPCs are inaccessible to anonymous/user/
     await assert.rejects(() => as(role, name, () => db.query('select * from forum_feedback_jobs')));
     await assert.rejects(() => as(role, name, () => db.query('select forum_feedback_jobs_list()')));
     await assert.rejects(() => as(role, name, () => db.query("select forum_feedback_jobs_claim('forged')")));
+    await assert.rejects(() => as(role, name, () => db.query('select forum_feedback_jobs_renew($1,$2,60)', [forum, randomUUID()])));
     await assert.rejects(() => as(role, name, () => db.query("select forum_feedback_jobs_record($1,$2,'blocked')", [forum, randomUUID()])));
   }
   await assert.rejects(() => service(() => db.query('select * from forum_feedback_jobs')));
 });
 const claim = (id = null) => service(() => db.query("select forum_feedback_jobs_claim('fixture-worker',$1,60) r", [id])).then((r) => r.rows[0].r);
 const record = (job, status, metadata = {}, token = job.lease_token) => service(() => db.query('select forum_feedback_jobs_record($1,$2,$3,$4::jsonb) r', [job.id, token, status, JSON.stringify(metadata)])).then((r) => r.rows[0].r);
+const renew = (job, metadata = {}, token = job.lease_token) => service(() => db.query('select forum_feedback_jobs_renew($1,$2,3600,$3::jsonb) r', [job.id, token, JSON.stringify(metadata)])).then((r) => r.rows[0].r);
 const jobId = (id) => db.query('select id from forum_feedback_jobs where feedback_id=$1 order by created_at desc limit 1', [id]).then((r) => r.rows[0].id);
 let leased;
 await check('operator list omits tokens and a job has one live lease', async () => {
@@ -173,6 +175,70 @@ await check('forum list paginates real rows without product records or duplicate
 await check('legacy invalid child and0031 whitespace protection remain intact', async () => {
   await edit(legacy, { title: 'Legacy title edited' }); assert.equal((await db.query('select body from feedback_comments where id=$1', [invalidComment])).rows[0].body, '\t\t');
   await assert.rejects(() => user(() => write('create', create(randomUUID(), { title: '\u00a0\u00a0' }))), /feedback_invalid/);
+});
+await check('a long repair can checkpoint and renew repeatedly without spending repair attempts', async () => {
+  const id = randomUUID(); await user(() => write('create', create(id)));
+  const lease = await claim(await jobId(id));
+  const task = 'forum-feedback/' + id;
+  for (let index = 0; index < 6; index++) {
+    await db.query("update forum_feedback_jobs set lease_until=clock_timestamp()+interval '1 second' where id=$1", [lease.id]);
+    const updated = await renew(lease, { task_key: task });
+    assert.equal(updated.attempts, 1); assert.equal(updated.task_key, task);
+    assert(!('lease_token' in updated)); assert(!('snapshot' in updated));
+  }
+  await assert.rejects(() => renew(lease, { task_key: 'different-task' }), /forum_queue_association_conflict/);
+  await assert.rejects(() => renew(lease, {}, randomUUID()), /forum_queue_lease/);
+  await assert.rejects(() => record(lease, 'blocked', { task_key: 'different-task' }), /forum_queue_association_conflict/);
+  const pr = 'https://github.com/simonliuliu/imtoken.fans/pull/8';
+  await renew(lease, { task_key: task, pr_url: pr });
+  await assert.rejects(() => renew(lease, { pr_url: 'https://github.com/simonliuliu/imtoken.fans/pull/9' }), /forum_queue_association_conflict/);
+  await record(lease, 'pr_ready', { task_key: task, pr_url: pr });
+});
+await check('expired linked work requires explicit recovery and rotates the old token', async () => {
+    const id = randomUUID(); await user(() => write('create', create(id)));
+    const lease = await claim(await jobId(id)); await renew(lease, { task_key: 'existing-task' });
+    await db.query("update forum_feedback_jobs set available_at='infinity' where id<>$1", [lease.id]);
+    await db.query("update forum_feedback_jobs set lease_until=clock_timestamp()-interval '1 second' where id=$1", [lease.id]);
+    await assert.rejects(() => renew(lease), /forum_queue_lease/);
+    const list = (await service(() => db.query('select forum_feedback_jobs_list(100) r'))).rows[0].r;
+    assert(list.some((job) => job.id === lease.id && job.requires_resume && job.task_key === 'existing-task'));
+    assert.equal(await claim(), null);
+    const resumed = await claim(lease.id); assert.notEqual(resumed.lease_token, lease.lease_token);
+    assert.equal(resumed.attempts, 1); assert.equal(resumed.lease_reclaims, 1);
+    await assert.rejects(() => renew(lease), /forum_queue_lease/);
+    await renew(resumed, { task_key: 'existing-task' });
+});
+await check('repeated expired leases remain discoverable and require explicit recovery at the limit', async () => {
+    const id = randomUUID(); await user(() => write('create', create(id)));
+    let lease = await claim(await jobId(id));
+    await db.query("update forum_feedback_jobs set available_at='infinity' where id<>$1", [lease.id]);
+    for (let index = 0; index < 5; index++) {
+      await db.query("update forum_feedback_jobs set lease_until=clock_timestamp()-interval '1 second' where id=$1", [lease.id]);
+      lease = await claim(lease.id); assert.equal(lease.attempts, 1);
+    }
+    await db.query("update forum_feedback_jobs set lease_until=clock_timestamp()-interval '1 second' where id=$1", [lease.id]);
+    const list = (await service(() => db.query('select forum_feedback_jobs_list(100) r'))).rows[0].r;
+    assert(list.some((job) => job.id === lease.id && job.requires_attention && job.consecutive_expirations === 5));
+    assert.equal(await claim(), null);
+    const resumed = await claim(lease.id); assert(resumed); assert.equal(resumed.attempts, 1);
+    assert.equal((await renew(resumed)).consecutive_expirations, 0);
+});
+await check('blocked linked work is visible but cannot be silently started as a new task', async () => {
+  const id = randomUUID(); await user(() => write('create', create(id)));
+  const lease = await claim(await jobId(id)); await renew(lease, { task_key: 'blocked-existing-task' });
+  await record(lease, 'blocked', { failure_reason: 'Synthetic follow-up' });
+  await db.query("update forum_feedback_jobs set available_at='infinity' where id<>$1", [lease.id]);
+  await db.query('update forum_feedback_jobs set available_at=clock_timestamp() where id=$1', [lease.id]);
+  const list = (await service(() => db.query('select forum_feedback_jobs_list(100) r'))).rows[0].r;
+  assert(list.some((job) => job.id === lease.id && job.requires_resume && job.task_key === 'blocked-existing-task'));
+  assert.equal(await claim(), null);
+  const resumed = await claim(lease.id); assert.equal(resumed.task_key, 'blocked-existing-task');
+});
+await check('content revisions invalidate checkpoint renewal', async () => {
+  const id = randomUUID(); await user(() => write('create', create(id)));
+  const lease = await claim(await jobId(id)); await renew(lease, { task_key: 'old-version-task' });
+  await edit(id, { title: 'Revised fictional title' });
+  await assert.rejects(() => renew(lease), /forum_queue_lease|forum_queue_stale/);
 });
 console.log(`${checks.length} full-baseline forum database checks passed; all records synthetic.`);
 await db.close();
