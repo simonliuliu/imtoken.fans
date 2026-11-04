@@ -54,6 +54,8 @@
 
 后续进展：等待管理登录期间，已在独立工作目录 `/Users/simonliu/.codex/worktrees/forum-moderation-consistency/imtoken.fans` 和分支 `codex/forum-moderation-consistency` 实现上述修复，建立 [草稿 PR #42](https://github.com/simonliuliu/imtoken.fans/pull/42)。隔离数据库、Action、权限及独立 QA 已完成；真实迁移和发布仍待管理会话，先接续论坛反馈 PR #41，不重复创建审核修复任务。
 
+2026-11-04 后续：用户已在 Chrome 登录，目标项目 SQL Editor 已可见；当前浏览器同时切换其他窗口，先等用户将项目页保持在前台。数据库预检、迁移与生产发布均尚未执行；登录已完成，无需再要求密码或重复登录。
+
 ## 后续队列与自动处理约定
 
 1. 完成本批通知跳转和用户故事基线，通过必要检查后自动合并发布，用户在线上 review。
