@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdminForAction, requirePermission } from "@/lib/admin-guard";
+import { hasPermission, requireAdminForAction, requirePermission } from "@/lib/admin-guard";
+import { getCurrentProfile } from "@/lib/profile";
 import { purgeContent, restoreContent, softDeleteContent, type ContentKind } from "@/lib/admin-moderation";
 import { refreshBadgesForUser } from "@/lib/badges";
 import { notifyBadgeAwarded } from "@/lib/notify";
 import { awardXpByRule, revokeContentXp } from "@/lib/xp";
 import type { ModerationMode, ModerationTargetType } from "@/lib/moderation/settings";
-import type { MuteDuration, Permissions, UserRole, UserTagKey } from "@/lib/types";
+import type { MuteDuration, Permissions, SubmissionStatus, UserRole, UserTagKey } from "@/lib/types";
 import { BADGE_INFO, PERMANENT_MUTE_UNTIL, muteDurationLabel } from "@/lib/types";
 
 // 后台从单页拆成了多页，改动之后要失效的路径不止 /admin 一个。
@@ -26,6 +27,40 @@ function revalidatePublicLists(): void {
   revalidatePath("/products");
   revalidatePath("/ideas");
   revalidatePath("/leaderboard");
+}
+
+async function changeSubmissionModeration(
+  actorId: string,
+  submissionId: string,
+  expectedRevision: number | null,
+  status: SubmissionStatus,
+  queueId: string | null = null,
+  reason: string | null = null
+): Promise<{ error?: string; revision?: number }> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("admin_moderate_submission", {
+    p_actor: actorId,
+    p_submission: submissionId,
+    p_expected_revision: expectedRevision,
+    p_status: status,
+    p_queue: queueId,
+    p_reason: reason,
+  });
+  if (error) {
+    if (error.message.includes("moderation_conflict")) return { error: "内容或审核状态已经变化，请刷新后重试。" };
+    if (error.message.includes("moderation_forbidden")) return { error: "没有权限执行这个操作。" };
+    if (error.message.includes("moderation_unavailable")) return { error: "内容不存在或已进入回收站，请刷新后重试。" };
+    console.error("[changeSubmissionModeration] 审核事务失败", error);
+    return { error: "审核服务暂时不可用，请稍后重试。" };
+  }
+  if (!data || !Number.isSafeInteger(data.revision) || data.revision < 0) {
+    return { error: "审核结果无法确认，请刷新后查看。" };
+  }
+  if (status === "published" && typeof data.author_id === "string") {
+    try { await refreshBadgesForUser(data.author_id); }
+    catch (badgeError) { console.error("[changeSubmissionModeration] 徽章刷新失败", badgeError); }
+  }
+  return { revision: data.revision };
 }
 
 // ========== 内容审核设置 ==========
@@ -56,6 +91,12 @@ export async function moderateQueueItem(
   decision: "approved" | "rejected",
   reason?: string
 ): Promise<{ error?: string }> {
+  if (decision !== "approved" && decision !== "rejected") return { error: "无效的审核决定。" };
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "请先登录" };
+  if (!hasPermission(profile, "moderate_submissions") && !hasPermission(profile, "moderate_comments")) {
+    return { error: "没有权限执行这个操作" };
+  }
   const admin = createAdminClient();
   const { data: queueItem, error: queueError } = await admin
     .from("moderation_queue")
@@ -68,16 +109,24 @@ export async function moderateQueueItem(
 
   // 提交和评论分属不同的权限——评论审核模式默认是"不审核"，但 admin 之后可能把它切回
   // 人工/AI，这种情况下应该看 moderate_comments 而不是 moderate_submissions。
-  const guard = await requirePermission(
-    queueItem.target_type === "submission" ? "moderate_submissions" : "moderate_comments"
-  );
-  if ("error" in guard) return { error: guard.error };
+  if (!hasPermission(profile, queueItem.target_type === "submission" ? "moderate_submissions" : "moderate_comments")) {
+    return { error: "没有权限执行这个操作" };
+  }
+  const guard = { profile };
 
   const table = queueItem.target_type === "submission" ? "submissions" : "comments";
   const authorColumn = queueItem.target_type === "submission" ? "submitted_by" : "user_id";
   // 提交还要知道是产品还是点子（两者的经验值不一样）。
   const returningColumns = queueItem.target_type === "submission" ? "submitted_by, type" : "user_id";
   const status = decision === "approved" ? "published" : "rejected";
+
+  if (queueItem.target_type === "submission") {
+    const result = await changeSubmissionModeration(profile.id, queueItem.target_id, null, status, queueId, reason ?? null);
+    if (result.error) return { error: result.error };
+    revalidateAdmin();
+    revalidatePublicLists();
+    return {};
+  }
 
   // 只改还没进回收站的内容：队列面板已经把被删的条目过滤掉了，
   // 但页面数据可能是几分钟前的，这里再挡一次，避免「通过」一条其实已经删掉的内容。
@@ -143,25 +192,20 @@ export async function moderateQueueItem(
 
 export async function setSubmissionStatus(
   submissionId: string,
-  status: "published" | "rejected" | "pending"
-): Promise<{ error?: string }> {
+  status: SubmissionStatus,
+  expectedRevision: number
+): Promise<{ error?: string; revision?: number }> {
   const guard = await requirePermission("moderate_submissions");
   if ("error" in guard) return { error: guard.error };
-
-  const admin = createAdminClient();
-  const { error } = await admin.from("submissions").update({ status }).eq("id", submissionId);
-  if (error) return { error: error.message };
-
-  await admin.from("admin_logs").insert({
-    admin_id: guard.profile.id,
-    action: `submission_set_status_${status}`,
-    target_type: "submission",
-    target_id: submissionId,
-  });
+  if (!["published", "pending", "rejected"].includes(status) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    return { error: "审核信息已过期，请刷新后重试。" };
+  }
+  const result = await changeSubmissionModeration(guard.profile.id, submissionId, expectedRevision, status);
+  if (result.error) return result;
 
   revalidateAdmin();
   revalidatePublicLists();
-  return {};
+  return result;
 }
 
 // 删除提交 = 软删除进回收站，7 天内可恢复。和「设为已驳回」是两件事：

@@ -1046,6 +1046,7 @@
     "productAlreadySubmitted": "This product link has already been submitted. Open the existing product page or contact an admin about ownership.",
     "submitCooldown": "Submitting too often — try again after {until}",
     "submitFailed": "Submission failed",
+    "submissionReviewChanged": "Your submission was received, but its status could not be confirmed. Check the review result in your profile.",
     "statsUsersInvalid": "User count must be a non-negative number",
     "statsDauInvalid": "DAU must be a non-negative number",
     "submissionNotFoundOrNotOwner": "Submission not found, or you don't own it",

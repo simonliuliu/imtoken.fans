@@ -29,7 +29,9 @@ export async function runModerationPipeline(
   params: PipelineParams
 ): Promise<"pending" | "published"> {
   const supabase = await createClient();
-  const mode = params.requireManual ? "manual" : await getModerationMode(supabase, params.targetType);
+  // Current submissions are products and forum posts, both requiring human
+  // review. Comments retain their independently configured moderation mode.
+  const mode = params.targetType === "submission" || params.requireManual ? "manual" : await getModerationMode(supabase, params.targetType);
   const admin = createAdminClient();
   const table = TARGET_TABLE[params.targetType];
 
@@ -62,6 +64,9 @@ export function scheduleCommentAiModeration(params: PipelineParams): void {
 }
 
 async function applyAiDecision(params: PipelineParams): Promise<void> {
+  // Old submission callbacks are additionally fenced by the database guard.
+  // New submission review remains human; comment AI keeps its existing path.
+  if (params.targetType === "submission") return;
   const decision = await runAiModeration({ targetType: params.targetType, content: params.content });
   // 没有结果（没配 Key / 调用失败 / 超时）：什么都不做，留在人工队列里等人来处理。
   if (!decision) return;
@@ -85,7 +90,6 @@ async function applyAiDecision(params: PipelineParams): Promise<void> {
 
   if (decision.approved) {
     await refreshBadgesForUser(params.authorId);
-    const { data: submission } = params.targetType === "submission" ? await admin.from("submissions").select("type").eq("id", params.targetId).maybeSingle() : { data: null };
-    await awardXpByRule({ userId: params.authorId, action: params.targetType === "comment" ? "comment_posted" : submission?.type === "post" ? "submission_post" : submission?.type === "product" ? "submission_product" : "submission_idea", refType: params.targetType, refId: params.targetId });
+    await awardXpByRule({ userId: params.authorId, action: "comment_posted", refType: params.targetType, refId: params.targetId });
   }
 }
