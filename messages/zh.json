@@ -1181,6 +1181,7 @@
       "problem": "问题描述",
       "situation": "使用场景与当前体验",
       "appVersion": "imToken 版本 / 浏览器版本",
+      "forumBrowserVersion": "浏览器版本",
       "device": "设备或平台",
       "steps": "复现步骤",
       "expected": "预期表现",
@@ -1193,6 +1194,7 @@
     "placeholders": {
       "module": "例如：转账、资产、DApp 浏览器",
       "appVersion": "例如：2.18.0",
+      "forumBrowserVersion": "例如：Chrome 130",
       "steps": "1. 打开…… 2. 点击…… 3. 观察到……",
       "scenario": "你在什么情况下使用这个功能？",
       "proposal": "你希望它如何改进？",
@@ -1219,7 +1221,10 @@
     "bugDescriptionPlaceholder": "描述遇到的异常，以及它对你造成的影响。",
     "suggestionDescriptionPlaceholder": "说明目前哪里不顺手，以及你希望改善什么。",
     "descriptionTooLong": "完整反馈共 {count} 字，最多 5000 字。",
-    "feedbackRequirements": "标题和问题描述至少各 2 个字；补充信息为选填，完整描述最多 5000 字。"
+    "feedbackRequirements": "标题和问题描述至少各 2 个字；补充信息为选填，完整描述最多 5000 字。",
+    "forumFeedbackTitle": "提交论坛反馈",
+    "forumFeedbackIntro": "反馈 imToken Fans 论坛的问题或改进建议，帮助我们完善发帖、管理、成长和消息体验。",
+    "forumFeedbackType": "论坛反馈"
   },
   "community": {
     "demoCommunity": "演示社区",
@@ -1339,7 +1344,8 @@
       "cases": "案例分析",
       "guides": "指南提醒",
       "questionsSafety": "求助问答",
-      "builds": "社区产品"
+      "builds": "社区产品",
+      "forum": "论坛反馈"
     },
     "states": {
       "pending": "待整理",
@@ -1670,7 +1676,8 @@
       "wallet": "钱包管理",
       "transfer": "转账与交易",
       "browser": "DApp 浏览器",
-      "other": "其他 / 不确定"
+      "other": "其他 / 不确定",
+      "forum": "论坛自身"
     },
     "states": {
       "inbox": "待整理",
@@ -1790,7 +1797,27 @@
     "checkPublished": "查看已发布反馈",
     "retryLegacy": "使用原编号重试",
     "reloadDraft": "重新读取草稿",
-    "persistentDraftUnavailable": "浏览器无法保存或恢复草稿。请复制内容备份，暂勿离开页面；为避免重复发布，保存成功前不会发送新提交。"
+    "persistentDraftUnavailable": "浏览器无法保存或恢复草稿。请复制内容备份，暂勿离开页面；为避免重复发布，保存成功前不会发送新提交。",
+    "forumIntake": "这里收集 imToken Fans 论坛自身的问题与建议。处理进展以实际更新为准，请勿提交钱包私密信息。",
+    "structuredDetails": "反馈信息",
+    "kindBug": "问题反馈",
+    "kindSuggestion": "改进建议",
+    "detailFields": {
+      "appVersion": "版本",
+      "device": "设备",
+      "steps": "复现步骤",
+      "expected": "预期结果",
+      "actual": "实际结果",
+      "scenario": "使用场景",
+      "proposal": "建议方案",
+      "impact": "预期帮助"
+    },
+    "devices": {
+      "ios": "iOS",
+      "android": "Android",
+      "browserExtension": "浏览器",
+      "other": "其他"
+    }
   },
   "feedbackErrors": {
     "configuration": "产品反馈数据服务尚未配置，请联系管理员完成连接后重试。",
@@ -1803,7 +1830,8 @@
     "conflict": "内容已经更新或此请求与已保存的记录不一致。请刷新查看最新版本后重试，避免覆盖他人修改。",
     "not_found": "此反馈或评论不存在，或当前不可见。",
     "parent": "回复的评论已不可用或已移出当前 IDEA，请重新选择回复对象。",
-    "merge_blocked": "该 IDEA 已参与其他合并，请先撤销原合并，不能进行链式合并。"
+    "merge_blocked": "该 IDEA 已参与其他合并，请先撤销原合并，不能进行链式合并。",
+    "scope": "论坛反馈与钱包产品反馈不能互相改类或合并。"
   },
   "publishPage": {
     "title": "发布",

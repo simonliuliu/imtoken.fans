@@ -42,6 +42,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 按 `docs/agent-workflow.md` 执行：**主聊天总调度 + Claude 设计 + GPT 统一前后端开发**，
 QA 按风险启用。原九角色仅在 `docs/archive/agents-v1/` 留存，不再默认调度。
 
+- 2026-11-04 用户指定：本项目程序优化、实现及整合由当前聊天所选 Terra Max 负责；设计方向、主要交互及设计规范继续使用现有 Claude 设计渠道，按风险独立 QA 保留。下方原 Sol 默认值作为历史配置，不覆盖用户本次明确选择。可见运行模型、用户在界面的选择与推理强度分别记录，不以模型自述或自动化提示词断言底层路由；不得擅改个人全局配置。
+
 - 主聊天默认 GPT-6.1 Sol / medium，负责需求、Brief、任务卡、整合与路线图。
 - 设计 Prompt/模型在 `.codex/external-agents/designer.toml`：Claude Opus 5.5 / low。
   由主调度使用 `scripts/run-claude-design.py` 经已有 magpie/Devin 调用；已实测成功。

@@ -40,7 +40,7 @@ export const DEMO_POSTS: DemoPost[] = [
 ];
 export const SECTION_CATEGORIES: Record<CommunitySection, string[]> = {
   safety: ["stories", "cases", "guides", "questionsSafety"],
-  feedback: ["wallet", "builds", "changelog"],
+  feedback: ["wallet", "forum", "builds", "changelog"],
   discussion: ["questions", "research", "industry"],
   activities: ["announcements", "community", "checkin"],
 };

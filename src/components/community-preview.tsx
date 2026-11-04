@@ -4,7 +4,7 @@ import Image from "next/image";
 import { FEEDBACK_CHANGED } from "@/lib/feedback";
 import { CoCreationFeedContext } from "@/components/co-creation-feed-context";
 import { CooperationPreview } from "@/components/cooperation-preview";
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { SECTION_CATEGORIES, compareDemoPopularity, type CommunitySection, type DemoPost } from "@/lib/community-demo";
@@ -56,25 +56,34 @@ function DemoFeed({ posts, section, productsContent, initialCategory = "all", in
   const [sort, setSort] = useState<SortMode>("latest");
   const [category, setCategory] = useState(() => section && SECTION_CATEGORIES[section].includes(initialCategory) ? initialCategory : "all");
   const [visible, setVisible] = useState(8);
+  const [feedbackId, setFeedbackId] = useState(initialId);
   const showProducts = section === "feedback" && category === "builds";
-  const showFeedback = section === "feedback" && category === "wallet";
+  const showFeedback = section === "feedback" && (category === "wallet" || category === "forum");
   useEffect(() => {
     if (section !== "feedback") return;
-    const changed = () => { setCategory("wallet"); onCategoryChange?.("wallet"); };
+    const changed = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string; module?: string }>).detail;
+      const next = detail?.module === "forum" ? "forum" : "wallet";
+      if (detail?.id) setFeedbackId(detail.id);
+      setCategory(next); onCategoryChange?.(next);
+    };
     window.addEventListener(FEEDBACK_CHANGED, changed);
     return () => window.removeEventListener(FEEDBACK_CHANGED, changed);
   }, [section, onCategoryChange]);
-  function changeCategory(next: string) {
+  const changeCategory = useCallback((next: string, preserveId = false) => {
+    if (!preserveId) setFeedbackId(null);
     setCategory(next);
     onCategoryChange?.(next);
     setVisible(8);
     if (section) {
       const url = new URL(window.location.href);
+      if (!preserveId) { url.searchParams.delete("idea"); url.searchParams.delete("commentOffset"); url.hash = ""; }
       if (next === "all") url.searchParams.delete("category");
       else url.searchParams.set("category", next);
       window.history.replaceState(null, "", url);
     }
-  }
+  }, [section, onCategoryChange]);
+  const openFeedback = useCallback((module: string, id: string | null) => { setFeedbackId(id); changeCategory(module === "forum" ? "forum" : "wallet", true); }, [changeCategory]);
   const filtered = posts.filter((post) => !(post.section === "feedback" && (post.category === "wallet" || (section === "feedback" && post.category === "builds"))) && (!section || post.section === section) && (category === "all" || post.category === category) && (sort !== "recommended" || post.featured === true)).sort((a, b) => sort === "popular" ? compareDemoPopularity(a, b) : b.createdAt.localeCompare(a.createdAt));
   const hasSidebar = !section || section === "discussion";
   return <div className={`community-layout ${hasSidebar ? section ? "community-discussion-layout" : "community-home-layout" : "community-board-layout"}`}>
@@ -86,7 +95,8 @@ function DemoFeed({ posts, section, productsContent, initialCategory = "all", in
       <div className="community-feed-heading"><SortTabs value={sort} onChange={(next) => { setSort(next); setVisible(8); }} />{section !== "feedback" && <span>{t("postCount", { count: filtered.length })}</span>}</div>
       <CoCreationFeedContext.Provider value={{ sort, category }}>
         {section === "feedback" && <>
-          <div hidden={category !== "all" && !showFeedback}><CooperationPreview embedded initialId={initialId} sort={sort} overview={category === "all"} onOpen={() => changeCategory("wallet")} /></div>
+          <div hidden={category !== "all" && !showFeedback}><CooperationPreview embedded initialId={feedbackId} scope={category === "forum" ? "forum" : "product"} sort={sort} overview={category === "all"} onOpen={openFeedback} /></div>
+          {category === "all" && <CooperationPreview embedded scope="forum" sort={sort} overview onOpen={openFeedback} />}
           <div hidden={category !== "all" && !showProducts}>{productsContent}</div>
         </>}
         {!showProducts && !showFeedback && <>
