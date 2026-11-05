@@ -129,7 +129,9 @@ export async function createSubmission(
   if (screenshotPaths.length === 0) return { error: t("productScreenshotRequired") };
   if (productPlatforms.length === 0) return { error: t("productPlatformRequired") };
   if (!pricingType || !launchStage || !makerRelationship) return { error: t("productDetailsRequired") };
-  if (await isBlacklisted(profile.id)) {
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return { error: t("submitFailed") };
+  if (blacklisted) {
     return { error: t("blacklistedSubmit") };
   }
 

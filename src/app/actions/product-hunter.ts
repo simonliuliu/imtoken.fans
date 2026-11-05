@@ -17,7 +17,9 @@ export async function toggleProductSupport(
   const t = await getTranslations("productRating.errors");
   const profile = await getCurrentProfile();
   if (!profile) return { error: t("signIn") };
-  if (await isBlacklisted(profile.id)) return { error: t("notAllowed") };
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return { error: t("operationFailed") };
+  if (blacklisted) return { error: t("notAllowed") };
 
   const supabase = await createClient();
   const { data: product } = await supabase
@@ -74,7 +76,9 @@ export async function upsertProductRating(
   const t = await getTranslations("productRating.errors");
   const profile = await getCurrentProfile();
   if (!profile) return { error: t("signIn") };
-  if (await isBlacklisted(profile.id)) return { error: t("notAllowed") };
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return { error: t("operationFailed") };
+  if (blacklisted) return { error: t("notAllowed") };
 
   const rating = Math.round(input.rating);
   const body = input.body.trim();

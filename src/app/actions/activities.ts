@@ -78,7 +78,9 @@ export async function dailyCheckIn(): Promise<CheckinResult> {
 
   const profile = await getCurrentProfile();
   if (!profile) return fail(t("notSignedIn"));
-  if (await isBlacklisted(profile.id)) return fail(t("blacklistedActivity"));
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return fail(t("checkinFailed"));
+  if (blacklisted) return fail(t("blacklistedActivity"));
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("perform_checkin", { p_user_id: profile.id });
@@ -173,7 +175,9 @@ export async function drawLottery(): Promise<LotteryResult> {
 
   const profile = await getCurrentProfile();
   if (!profile) return fail(t("notSignedIn"));
-  if (await isBlacklisted(profile.id)) return fail(t("blacklistedActivity"));
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return fail(t("lotteryFailed"));
+  if (blacklisted) return fail(t("blacklistedActivity"));
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("perform_lottery_draw", { p_user_id: profile.id });
