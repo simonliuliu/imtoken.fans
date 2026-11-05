@@ -259,26 +259,21 @@ export async function setUserTag(userId: string, tagKey: UserTagKey, on: boolean
   const guard = await requirePermission("manage_user_tags");
   if ("error" in guard) return { error: guard.error };
 
-  const admin = createAdminClient();
-  if (on) {
-    const { error } = await admin
-      .from("user_tags")
-      .upsert({ user_id: userId, tag_key: tagKey, set_by: guard.profile.id }, { onConflict: "user_id,tag_key" });
-    if (error) return { error: error.message };
-  } else {
-    const { error } = await admin.from("user_tags").delete().eq("user_id", userId).eq("tag_key", tagKey);
-    if (error) return { error: error.message };
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("admin_set_user_tag", {
+      p_actor: guard.profile.id,
+      p_user_id: userId,
+      p_tag_key: tagKey,
+      p_on: on,
+    });
+    if (error) return { error: "标签操作结果未确认，请刷新页面核对后再试" };
+
+    revalidateAdmin();
+    return {};
+  } catch {
+    return { error: "标签操作结果未确认，请刷新页面核对后再试" };
   }
-
-  await admin.from("admin_logs").insert({
-    admin_id: guard.profile.id,
-    action: on ? `tag_added_${tagKey}` : `tag_removed_${tagKey}`,
-    target_type: "profile",
-    target_id: userId,
-  });
-
-  revalidateAdmin();
-  return {};
 }
 
 // 颁发 / 撤销荣誉徽章。granted_by 记下是谁给的，同时也是「人工授予」的标记：
