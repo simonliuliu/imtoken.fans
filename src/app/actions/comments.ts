@@ -53,7 +53,9 @@ export async function postComment(
   if (profile.mutedUntil && new Date(profile.mutedUntil) > new Date()) {
     return { error: t("muted", { until: new Date(profile.mutedUntil).toLocaleString(await getLocale()) }) };
   }
-  if (await isBlacklisted(profile.id)) {
+  const blacklisted = await isBlacklisted(profile.id);
+  if (blacklisted === null) return { error: t("commentFailed") };
+  if (blacklisted) {
     return { error: t("blacklistedComment") };
   }
 

@@ -16,13 +16,19 @@ export async function getUserTagsMap(userIds: string[]): Promise<Record<string, 
   return map;
 }
 
-export async function isBlacklisted(userId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("user_tags")
-    .select("tag_key")
-    .eq("user_id", userId)
-    .eq("tag_key", "blacklisted")
-    .maybeSingle();
-  return Boolean(data);
+// null means the restriction could not be checked, not that the user is allowed.
+export async function isBlacklisted(userId: string): Promise<boolean | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("user_tags")
+      .select("tag_key")
+      .eq("user_id", userId)
+      .eq("tag_key", "blacklisted")
+      .maybeSingle();
+    if (error || data === undefined) return null;
+    return data !== null;
+  } catch {
+    return null;
+  }
 }
