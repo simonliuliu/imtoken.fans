@@ -20,7 +20,7 @@
 
 ## ADM-02 后续：活动与处分事务并发（候选）
 
-2026-11-05：独立 PostgreSQL 多连接复现表明，在应用层已查询未受限后，即使黑名单随后提交，旧活动 RPC 仍可能成功；仅锁公开资料行再读标签在旧 `REPEATABLE READ` 快照下仍不足以阻止此情况。独立工作目录使用 `codex/activity-restriction-atomicity` 继续同一 ADM-02 任务，不另建产品需求。
+2026-11-05：独立 PostgreSQL 多连接复现表明，在应用层已查询未受限后，即使黑名单随后提交，旧活动 RPC 仍可能成功；仅锁公开资料行再读标签在旧 `REPEATABLE READ` 快照下仍不足以阻止此情况。独立工作目录使用 `codex/activity-restriction-atomicity` 和 [草稿 PR #45](https://github.com/simonliuliu/imtoken.fans/pull/45) 继续同一 ADM-02 任务，不另建产品需求。
 
 候选 0034 保留现有活动 RPC 的名称、对象 ID 和授权；成功签到/抽奖必须插入的流水新增事务内限制检查。标签管理通过仅 service-role 可调用的事务 RPC，按固定顺序锁住操作者和目标资料行，更新私有 guard 版本，再变更标签并记审计。活动与处分竞争同一用户时先后有序；旧快照竞争私有版本时由数据库拒绝提交。原始服务角色标签写入被撤销并检查继承及列级授权，普通标签读取不变。
 
