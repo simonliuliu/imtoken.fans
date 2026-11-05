@@ -20,8 +20,11 @@ select
       and p.proname in ('activity_restriction_touch', 'activity_restriction_enforce', 'admin_set_user_tag')
   ) as function_names_available;
 
--- Compare both definition hashes and contracts with the audited 0016/0017
--- baseline; unknown functions/dependencies require review before any DDL.
+-- Audited 0016/0017 baseline fingerprints (PG 16.9 and isolated PGlite):
+-- perform_checkin: b40bcfc698adca7cb13edc0f83cc4f83
+-- perform_lottery_draw: 822463bec87a1594c794075c14dd925e
+-- A mismatch, including a difference caused by PostgreSQL version, blocks the
+-- candidate migration and requires review; fingerprints do not audit unknown dependencies.
 select p.oid::regprocedure::text as function_name,
        pg_get_userbyid(p.proowner) as owner,
        p.prosecdef as security_definer,
@@ -50,6 +53,13 @@ order by r.rolname;
 -- Preserve the exact table and column ACL metadata for the rollback plan.
 select pg_get_userbyid(c.relowner) as owner, c.relacl::text as table_acl
 from pg_catalog.pg_class c where c.oid = 'public.user_tags'::regclass;
+select c.oid::regclass::text as table_name, pg_get_userbyid(c.relowner) as owner,
+       r.rolname as application_role, pg_has_role(r.oid, c.relowner, 'MEMBER') as can_assume_owner
+from pg_catalog.pg_class c cross join pg_catalog.pg_roles r
+where c.oid in ('public.profiles'::regclass, 'public.user_tags'::regclass,
+                'public.checkins'::regclass, 'public.lottery_draws'::regclass)
+  and r.rolname in ('anon', 'authenticated', 'service_role')
+order by table_name, application_role;
 select a.attname, a.attacl::text as column_acl
 from pg_catalog.pg_attribute a
 where a.attrelid = 'public.user_tags'::regclass and a.attnum > 0
@@ -71,6 +81,28 @@ where not t.tgisinternal and t.tgrelid in (
   'public.checkins'::regclass, 'public.lottery_draws'::regclass
 )
 order by table_name, t.tgname;
+
+-- Audit all non-system SECURITY DEFINER functions, not just the activity RPCs.
+-- The candidate automatically rejects unreviewed direct references to user_tags;
+-- dynamic SQL, indirect calls, views and privileged external writers still need
+-- a human/operator audit before activation. Definitions themselves are not printed.
+with definitions as materialized (
+  select p.oid, n.nspname, pg_get_userbyid(p.proowner) as owner, p.proacl,
+         case when p.prokind in ('f', 'p') then pg_get_functiondef(p.oid) end as definition
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+  where p.prosecdef and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+)
+select oid::regprocedure::text as function_name, owner, proacl::text as function_acl,
+       md5(definition) as definition_fingerprint,
+       coalesce(definition ~* 'user_tags', false) as directly_mentions_user_tags
+from definitions where definition is not null order by function_name;
+
+select schemaname, viewname, viewowner, md5(definition) as definition_fingerprint
+from pg_catalog.pg_views
+where schemaname !~ '^pg_' and schemaname <> 'information_schema'
+  and definition ~* 'user_tags'
+order by schemaname, viewname;
 
 -- Aggregate counts are only a change detector, not a backup.
 select (select count(*) from public.profiles) as profiles,

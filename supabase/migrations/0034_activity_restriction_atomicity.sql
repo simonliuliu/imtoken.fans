@@ -20,6 +20,57 @@ begin
      or to_regprocedure('public.perform_lottery_draw(uuid)') is null then
     raise exception '0034_requires_complete_0032_and_0033';
   end if;
+  -- The guard depends on every successful legacy RPC writing its ledger.
+  -- Stop on definition drift instead of assuming an unknown RPC still does so.
+  if md5(pg_catalog.pg_get_functiondef('public.perform_checkin(uuid)'::regprocedure))
+       is distinct from 'b40bcfc698adca7cb13edc0f83cc4f83'
+     or md5(pg_catalog.pg_get_functiondef('public.perform_lottery_draw(uuid)'::regprocedure))
+       is distinct from '822463bec87a1594c794075c14dd925e' then
+    raise exception '0034_activity_function_drift_requires_inspection';
+  end if;
+  if exists (
+    select 1 from pg_catalog.pg_class c cross join pg_catalog.pg_roles r
+    where c.oid in ('public.profiles'::regclass, 'public.user_tags'::regclass,
+                    'public.checkins'::regclass, 'public.lottery_draws'::regclass)
+      and r.rolname in ('anon', 'authenticated', 'service_role')
+      and pg_catalog.pg_has_role(r.oid, c.relowner, 'MEMBER')
+  ) then
+    raise exception '0034_application_role_can_assume_table_owner';
+  end if;
+  -- An earlier BEFORE INSERT trigger could suppress a ledger row before our
+  -- guard runs; any unknown trigger on these tables requires investigation.
+  if exists (
+    select 1 from pg_catalog.pg_trigger t
+    where not t.tgisinternal
+      and t.tgrelid in ('public.profiles'::regclass, 'public.user_tags'::regclass,
+                        'public.checkins'::regclass, 'public.lottery_draws'::regclass)
+  ) then
+    raise exception '0034_unreviewed_guarded_table_trigger';
+  end if;
+  -- A pre-existing SECURITY DEFINER writer could retain owner access after the
+  -- service-role table revoke. Stop on unreviewed direct references. This is
+  -- only one gate: dynamic or indirect dependencies still require preflight.
+  if exists (
+    with tag_definitions as materialized (
+      select p.oid, n.nspname,
+        case when p.prokind in ('f', 'p') then pg_catalog.pg_get_functiondef(p.oid) end as definition
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where p.prosecdef and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+    )
+    select 1 from tag_definitions d
+    where d.definition ~* 'user_tags'
+      and not coalesce((
+        d.nspname = 'public' and (
+          (d.oid = to_regprocedure('public.community_actor(uuid)')
+            and md5(d.definition) = '5561604d64a55d2df3226adf8cbf84b0')
+          or (d.oid = to_regprocedure('public.feedback_actor(boolean)')
+            and md5(d.definition) = '4c025728f878357d3772a5cc5402661a')
+        )
+      ), false)
+  ) then
+    raise exception '0034_unreviewed_tag_security_definer';
+  end if;
   if to_regclass('public.activity_restriction_guard') is not null
      or exists (
        select 1 from pg_catalog.pg_proc p

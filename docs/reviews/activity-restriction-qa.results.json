@@ -1,0 +1,61 @@
+{
+  "stage": "complete",
+  "results": [
+    {
+      "name": "exact latest 0034 blocks queued pre-revoke legacy INSERT and DELETE at deployment commit",
+      "status": "PASS",
+      "evidence": {
+        "queuedInsert": "42501",
+        "queuedDelete": "42501"
+      }
+    },
+    {
+      "name": "post-deployment old application DML is rejected and new actor-bound RPC remains usable",
+      "status": "PASS"
+    },
+    {
+      "name": "member permission is exact boolean, actor and target validation rejects without audit mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate read committed checkin waits then fails closed with no asset changes",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate read committed lottery waits then fails closed with no asset changes",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate repeatable read checkin waits then fails closed with no asset changes",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate repeatable read lottery waits then fails closed with no asset changes",
+      "status": "PASS"
+    },
+    {
+      "name": "actual guard handles concurrent cross-admin restrictions and upsert/delete without deadlock",
+      "status": "PASS"
+    },
+    {
+      "name": "tag, private guard and audit all roll back when audit insert fails",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate rejects lottery and rolls back xp reward, stock and costs",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate rejects lottery and rolls back badge reward, stock and costs",
+      "status": "PASS"
+    },
+    {
+      "name": "actual candidate rejects lottery and rolls back ticket reward, stock and costs",
+      "status": "PASS"
+    },
+    {
+      "name": "account deletion cascades after activity transaction and clears private guard",
+      "status": "PASS"
+    }
+  ]
+}

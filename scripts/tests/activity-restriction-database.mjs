@@ -63,6 +63,56 @@ await check("unexpected default grants on new guard objects abort the migration"
   }
 });
 
+await check("an unreviewed activity RPC definition aborts the migration", async () => {
+  const original = (await db.query("select pg_get_functiondef('public.perform_checkin(uuid)'::regprocedure) definition")).rows[0].definition;
+  const changed = original.replace("签到暂未开放", "签到维护中");
+  assert.notEqual(changed, original);
+  await db.exec(changed);
+  try {
+    await assert.rejects(() => db.exec(migration), /0034_activity_function_drift_requires_inspection/);
+    await db.exec("rollback");
+    assert.equal((await db.query("select to_regclass('public.activity_restriction_guard') guard")).rows[0].guard, null);
+  } finally {
+    await db.exec(original);
+  }
+});
+
+await check("an application role that owns a protected table aborts the migration", async () => {
+  await db.exec("alter table public.user_tags owner to service_role");
+  try {
+    await assert.rejects(() => db.exec(migration), /0034_application_role_can_assume_table_owner/);
+    await db.exec("rollback");
+    assert.equal((await db.query("select to_regclass('public.activity_restriction_guard') guard")).rows[0].guard, null);
+  } finally {
+    await db.exec("alter table public.user_tags owner to current_user");
+  }
+});
+
+await check("an unknown ledger trigger that could suppress a check-in aborts the migration", async () => {
+  await db.exec(`create function public.qa_skip_checkin() returns trigger language plpgsql as $$ begin return null; end $$;
+    create trigger aaa_qa_skip_checkin before insert on public.checkins for each row execute function public.qa_skip_checkin();`);
+  try {
+    await assert.rejects(() => db.exec(migration), /0034_unreviewed_guarded_table_trigger/);
+    await db.exec("rollback");
+    assert.equal((await db.query("select to_regclass('public.activity_restriction_guard') guard")).rows[0].guard, null);
+  } finally {
+    await db.exec("drop trigger aaa_qa_skip_checkin on public.checkins; drop function public.qa_skip_checkin()");
+  }
+});
+
+await check("an unreviewed SECURITY DEFINER tag writer aborts the migration", async () => {
+  await db.exec(`create function public.qa_legacy_tag_writer(p_user uuid) returns void language sql security definer as $$
+    delete from public.user_tags where user_id = p_user and tag_key = 'blacklisted'
+  $$`);
+  try {
+    await assert.rejects(() => db.exec(migration), /0034_unreviewed_tag_security_definer/);
+    await db.exec("rollback");
+    assert.equal((await db.query("select to_regclass('public.activity_restriction_guard') guard")).rows[0].guard, null);
+  } finally {
+    await db.exec("drop function public.qa_legacy_tag_writer(uuid)");
+  }
+});
+
 const before = (await db.query(`select
   (select count(*) from profiles) profiles,
   (select count(*) from user_tags) tags,
