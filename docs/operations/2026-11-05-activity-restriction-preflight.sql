@@ -25,8 +25,11 @@ select
 -- perform_lottery_draw: 822463bec87a1594c794075c14dd925e
 -- A mismatch, including a difference caused by PostgreSQL version, blocks the
 -- candidate migration and requires review; fingerprints do not audit unknown dependencies.
+-- The migration must use the same trusted owner shown for both activity RPCs:
+-- the postflight stops release if the new guard owner and legacy owners differ.
 select p.oid::regprocedure::text as function_name,
        pg_get_userbyid(p.proowner) as owner,
+       p.proowner=(select r.oid from pg_catalog.pg_roles r where r.rolname=current_user) as owned_by_execution_role,
        p.prosecdef as security_definer,
        pg_get_function_result(p.oid) as result_contract,
        md5(pg_get_functiondef(p.oid)) as definition_fingerprint,
@@ -95,14 +98,29 @@ with definitions as materialized (
 )
 select oid::regprocedure::text as function_name, owner, proacl::text as function_acl,
        md5(definition) as definition_fingerprint,
-       coalesce(definition ~* 'user_tags', false) as directly_mentions_user_tags
+       coalesce(definition ~* 'user_tags', false) as directly_mentions_user_tags,
+       has_function_privilege('anon',oid,'EXECUTE') as anon_execute,
+       has_function_privilege('authenticated',oid,'EXECUTE') as authenticated_execute,
+       has_function_privilege('service_role',oid,'EXECUTE') as service_execute
 from definitions where definition is not null order by function_name;
 
-select schemaname, viewname, viewowner, md5(definition) as definition_fingerprint
-from pg_catalog.pg_views
-where schemaname !~ '^pg_' and schemaname <> 'information_schema'
-  and definition ~* 'user_tags'
-order by schemaname, viewname;
+select v.schemaname, v.viewname, v.viewowner, md5(v.definition) as definition_fingerprint,
+       c.relacl::text as view_acl, c.reloptions,
+       coalesce((select jsonb_agg(jsonb_build_object('column',a.attname,'acl',a.attacl::text) order by a.attnum)
+                 from pg_catalog.pg_attribute a where a.attrelid=c.oid and a.attnum>0
+                   and not a.attisdropped and a.attacl is not null), '[]'::jsonb) as column_acls,
+       (has_table_privilege('anon',c.oid,'INSERT, UPDATE, DELETE')
+         or has_any_column_privilege('anon',c.oid,'INSERT, UPDATE')) as anon_write,
+       (has_table_privilege('authenticated',c.oid,'INSERT, UPDATE, DELETE')
+         or has_any_column_privilege('authenticated',c.oid,'INSERT, UPDATE')) as authenticated_write,
+       (has_table_privilege('service_role',c.oid,'INSERT, UPDATE, DELETE')
+         or has_any_column_privilege('service_role',c.oid,'INSERT, UPDATE')) as service_write
+from pg_catalog.pg_views v
+join pg_catalog.pg_namespace n on n.nspname=v.schemaname
+join pg_catalog.pg_class c on c.relnamespace=n.oid and c.relname=v.viewname
+where v.schemaname !~ '^pg_' and v.schemaname <> 'information_schema'
+  and v.definition ~* 'user_tags'
+order by v.schemaname, v.viewname;
 
 -- Aggregate counts are only a change detector, not a backup.
 select (select count(*) from public.profiles) as profiles,
