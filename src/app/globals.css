@@ -1172,7 +1172,8 @@ html {
 @media (max-width: 640px) {
   .fans-container, .community-shell { width: calc(100% - 32px); }
   .fans-header-inner { height: 60px; gap: 6px; }
-  .fans-brand img { width: 145px; height: 36px; }
+  .fans-brand { min-width: 0; flex-shrink: 1; }
+  .fans-brand img { width: 145px; max-width: 100%; height: auto; }
   .fans-header-tools { gap: 6px; }
   .fans-header-tools > div:first-child button { padding-inline: 7px; font-size: 10px; min-height: 32px; }
   .fans-desktop-account { display: none; }

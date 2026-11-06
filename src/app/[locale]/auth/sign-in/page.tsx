@@ -174,34 +174,13 @@ function SignInForm() {
   }
 
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_28rem] lg:py-20">
-      <aside className="relative hidden overflow-hidden rounded-[2rem] bg-ink p-10 text-white shadow-2xl shadow-slate-900/15 lg:block">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand/40 blur-3xl" aria-hidden />
-        <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" aria-hidden />
-        <div className="relative">
-          <p className="font-mono text-xs font-bold uppercase tracking-[.18em] text-blue-300">{t("valueEyebrow")}</p>
-          <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight">{t("valueTitle")}</h1>
-          <p className="mt-5 max-w-md text-sm leading-7 text-slate-300">{t("valueBody")}</p>
-          <div className="mt-10 flex flex-col gap-3">
-            <SignInBenefit icon="✦" title={t("makerBenefitTitle")} body={t("makerBenefitBody")} />
-            <SignInBenefit icon="◎" title={t("memberBenefitTitle")} body={t("memberBenefitBody")} />
-            <SignInBenefit icon="↗" title={t("progressBenefitTitle")} body={t("progressBenefitBody")} />
-          </div>
-        </div>
-      </aside>
-
-      <div className="w-full max-w-md justify-self-center">
-      <div className="mb-8 flex flex-col items-center text-center">
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[28rem] flex-col justify-center px-4 py-10 sm:px-0 sm:py-14">
+      <div className="mb-6 flex flex-col items-center text-center">
         <BrandLogo className="h-12 w-auto" />
         <h1 className="mt-4 text-2xl font-extrabold text-ink">
           {mode === "signin" ? t("titleSignIn") : t("titleSignUp")}
         </h1>
-        <p className="mt-1.5 text-sm text-muted">
-          {mode === "signin" ? t("subtitleSignIn") : t("subtitleSignUp")}
-        </p>
       </div>
-
-      <p className="mb-4 text-xs leading-6 text-muted">{t("accountBoundary")}</p>
 
       {!configured && (
         <div className="mb-4 rounded-xl bg-risk-soft px-4 py-3 text-xs text-risk">
@@ -232,6 +211,7 @@ function SignInForm() {
           <button
             type="button"
             onClick={() => setCredential("email")}
+            aria-pressed={credential === "email"}
             className={`flex-1 rounded-full py-1.5 transition-colors ${
               credential === "email" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"
             }`}
@@ -241,6 +221,7 @@ function SignInForm() {
           <button
             type="button"
             onClick={() => setCredential("username")}
+            aria-pressed={credential === "username"}
             className={`flex-1 rounded-full py-1.5 transition-colors ${
               credential === "username" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"
             }`}
@@ -256,7 +237,7 @@ function SignInForm() {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder={t("nicknamePlaceholder")}
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-base text-ink placeholder:text-faint focus:border-brand focus:outline-none sm:text-sm"
               />
             </FormField>
           )}
@@ -268,7 +249,7 @@ function SignInForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-base text-ink placeholder:text-faint focus:border-brand focus:outline-none sm:text-sm"
               />
             </FormField>
           ) : (
@@ -277,7 +258,7 @@ function SignInForm() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={t("usernamePlaceholder")}
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-base text-ink placeholder:text-faint focus:border-brand focus:outline-none sm:text-sm"
               />
             </FormField>
           )}
@@ -289,7 +270,8 @@ function SignInForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 pr-14 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none"
+                aria-describedby="account-safety"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 pr-14 text-base text-ink placeholder:text-faint focus:border-brand focus:outline-none sm:text-sm"
               />
               <button
                 type="button"
@@ -301,6 +283,8 @@ function SignInForm() {
             </div>
           </FormField>
 
+          <p id="account-safety" className="-mt-1 text-xs leading-5 text-muted">{t("accountBoundary")}</p>
+
           {mode === "signup" && (
             <FormField label={t("confirmPassword")}>
               <input
@@ -308,13 +292,13 @@ function SignInForm() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder={t("confirmPasswordPlaceholder")}
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-brand focus:outline-none"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-base text-ink placeholder:text-faint focus:border-brand focus:outline-none sm:text-sm"
               />
             </FormField>
           )}
 
-          {error && <p className="rounded-lg bg-risk-soft px-3 py-2 text-xs text-risk">{error}</p>}
-          {info && <p className="rounded-lg bg-good-soft px-3 py-2 text-xs text-good">{info}</p>}
+          {error && <p role="alert" className="rounded-lg bg-risk-soft px-3 py-2 text-xs text-risk">{error}</p>}
+          {info && <p role="status" className="rounded-lg bg-good-soft px-3 py-2 text-xs text-good">{info}</p>}
 
           <button
             type="submit"
@@ -371,13 +355,8 @@ function SignInForm() {
         </button>
       </p>
       <p className="mt-4 text-center text-[11px] leading-5 text-faint">{t.rich("terms", { guidelines: (chunks) => <Link href="/community-guidelines" className="underline hover:text-brand-ink">{chunks}</Link> })}</p>
-      </div>
     </div>
   );
-}
-
-function SignInBenefit({ icon, title, body }: { icon: string; title: string; body: string }) {
-  return <div className="flex gap-3 rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-blue-300">{icon}</span><div><p className="text-sm font-bold text-white">{title}</p><p className="mt-1 text-xs leading-5 text-slate-400">{body}</p></div></div>;
 }
 
 function FormField({ label, children }: { label: string; children: ReactNode }) {
