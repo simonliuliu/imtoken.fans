@@ -298,3 +298,7 @@ PR #31已将普通帖/产品/反馈发布修复整合至main。本地3000已获�
 2026-11-05 治理 P1：独立复现限制状态查询失败后签到、抽奖可能继续使用特权 RPC；已在独立分支修复为查询失败时阻止写入，覆盖同一检查的评论、投稿、支持及评分，工程与隔离回归通过，独立安全 QA 36 组通过。此批不依赖数据库迁移，精确生产结果见 [PR #44](https://github.com/simonliuliu/imtoken.fans/pull/44)，真实账号验证尚未完成；查询后限制状态改变的事务竞态及 ADM-02 完整警告/封禁仍待后续处理。详见 [任务卡](docs/tasks/blacklist-fail-closed.md)。
 
 同日论坛反馈分支同步主线 `50b83de`，保留双方路线图记录；受影响限制检查与投稿回归 15 项、隔离评论/投稿模式 10 项及 i18n/lint/build 通过。正式数据库预检、迁移和反馈入口发布仍待完成，见 [反馈任务卡](docs/tasks/forum-feedback-inbox.md)。
+
+2026-11-06 用户线上反馈：登录页精简为居中单栏，保留现有登录和注册入口及简短安全提醒，通用规则补充减少无意义说明；同时修复 320px 顶部导航溢出。隔离 WebKit 9 项、独立安全回归 16 项、中英 1,569 键、lint 和构建通过；真实账号及手机实机尚未验收。此批不依赖数据库迁移，已通过 [PR #46](https://github.com/simonliuliu/imtoken.fans/pull/46) 发布，精确 main `67da8fe` 的 Production deployment `7596104855` 成功；正式域名中英首页、活动与登录共 6 路径 HTTP 200，详见 [任务卡](docs/tasks/login-page-simplify.md) 和 [发布核验](https://github.com/simonliuliu/imtoken.fans/pull/46#issuecomment-6681338834)。论坛反馈入口、治理、交流和通知的原有验收范围保持不变。
+
+同日论坛反馈分支同步 `67da8fe`，保留登录精简及论坛反馈双方记录；受影响的隔离 WebKit 登录/导航 9 项、中英 1,593 键、lint、类型与 Webpack 构建通过，独立合并 QA 无阻塞。正式库只读预检尚未完成，0031/0032 未执行，反馈入口与私有队列尚未 Production，详见 [反馈任务卡](docs/tasks/forum-feedback-inbox.md)。
