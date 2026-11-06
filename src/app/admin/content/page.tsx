@@ -17,6 +17,7 @@ const STATUS_OPTIONS = [
 
 const TYPE_OPTIONS = [
   { value: "all", label: "全部类型" },
+  { value: "post", label: "社区帖子" },
   { value: "product", label: "产品" },
   { value: "idea", label: "点子" },
 ];
@@ -62,7 +63,7 @@ export default async function AdminContentPage({
       </AdminPanel>
 
       {submissions && (
-        <AdminPanel title="全部内容" count={submissions.total} description="已发布 / 待审核 / 已驳回的产品与点子">
+        <AdminPanel title="全部内容" count={submissions.total} description="已发布 / 待审核 / 已驳回的社区帖子、产品与点子">
           <div className="flex flex-col gap-3">
             <SearchInput placeholder="搜索标题或一句话简介…" />
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

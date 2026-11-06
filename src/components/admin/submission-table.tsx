@@ -23,7 +23,7 @@ export function SubmissionTable({
   const router = useRouter();
   // 服务端分页之后每次翻页都会换一批数据，所以不能把整份列表灌进 useState
   // （那样翻页后还显示旧数据）。只把「本地已经改过的部分」记在 state 里，叠在 props 上。
-  const [statusPatch, setStatusPatch] = useState<Record<string, SubmissionStatus>>({});
+  const [statusPatch, setStatusPatch] = useState<Record<string, { status: SubmissionStatus; revision: number }>>({});
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -31,19 +31,33 @@ export function SubmissionTable({
 
   const submissions = initialSubmissions
     .filter((s) => !deletedIds.includes(s.id))
-    .map((s) => (statusPatch[s.id] ? { ...s, status: statusPatch[s.id] } : s));
+    .map((s) => {
+      const patch = statusPatch[s.id];
+      return patch && patch.revision > (s.moderation_revision ?? -1)
+        ? { ...s, status: patch.status, moderation_revision: patch.revision }
+        : s;
+    });
 
-  function handleSetStatus(id: string, status: SubmissionStatus) {
+  function handleSetStatus(submission: SubmissionCard, status: SubmissionStatus) {
+    const { id, moderation_revision: revision } = submission;
+    if (!Number.isSafeInteger(revision) || revision === undefined) {
+      setError("审核信息尚未更新，请刷新页面后重试。");
+      return;
+    }
     setError(null);
     setPendingId(id);
     startTransition(async () => {
-      const result = await setSubmissionStatus(id, status);
+      const result = await setSubmissionStatus(id, status, revision);
       setPendingId(null);
       if (result.error) {
         setError(result.error);
         return;
       }
-      setStatusPatch((prev) => ({ ...prev, [id]: status }));
+      if (result.revision === undefined) {
+        setError("审核结果无法确认，请刷新后查看。");
+        return;
+      }
+      setStatusPatch((prev) => ({ ...prev, [id]: { status, revision: result.revision! } }));
       router.refresh();
     });
   }
@@ -101,7 +115,7 @@ export function SubmissionTable({
                     key={status}
                     type="button"
                     disabled={isPending && pendingId === s.id}
-                    onClick={() => handleSetStatus(s.id, status)}
+                    onClick={() => handleSetStatus(s, status)}
                     className="rounded-full border border-line px-3 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     设为{STATUS_LABEL[status]}

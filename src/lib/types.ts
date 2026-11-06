@@ -112,6 +112,7 @@ export interface SubmissionCard {
   built_from_idea_id: string | null;
   created_at: string;
   updated_at: string;
+  moderation_revision?: number;
   website_url: string | null;
   video_url: string | null;
   logo_path: string | null;
