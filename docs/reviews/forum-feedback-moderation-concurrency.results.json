@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "passed_groups": 11,
+  "checks": [
+    {
+      "name": "two live claim connections issue one lease while competing transaction stays uncommitted",
+      "status": "PASS"
+    },
+    {
+      "name": "renew-first edit waits on source then invalidates old token after commit",
+      "status": "PASS"
+    },
+    {
+      "name": "edit-first renewal waits on source and cannot revive edited or hidden job",
+      "status": "PASS"
+    },
+    {
+      "name": "renew-first hide waits on source then invalidates old token after commit",
+      "status": "PASS"
+    },
+    {
+      "name": "hide-first renewal waits on source and cannot revive edited or hidden job",
+      "status": "PASS"
+    },
+    {
+      "name": "actual lease expiry during source-lock wait rejects renewal after the blocker commits",
+      "status": "PASS"
+    },
+    {
+      "name": "two recovery connections preserve linked work and rotate old capability exactly once",
+      "status": "PASS"
+    },
+    {
+      "name": "0033 list winner fences opposite same-generation moderation decision",
+      "status": "PASS"
+    },
+    {
+      "name": "0033 queue winner fences opposite same-generation moderation decision",
+      "status": "PASS"
+    },
+    {
+      "name": "0033 concurrent same-generation queue inserts serialize on submission and create one pending row",
+      "status": "PASS"
+    },
+    {
+      "name": "source lock is acquired before job lock: blocked renew cannot deadlock the editing holder",
+      "status": "PASS"
+    }
+  ],
+  "harness_incident": {
+    "retained_evidence": "concurrency-results.json",
+    "initial_failure": "Authenticated fixture attempted raw feedback_posts SELECT FOR UPDATE and correctly received permission denied (42501).",
+    "resolution": "Retained ACL and assertions; used qa_owner solely to construct the blocking fixture. Follow-up case passed."
+  },
+  "environment": "PostgreSQL 16.9, Unix socket only; exact migrations 0001-0032 including pgcrypto plus separate exact 0033; four real independent backend connections per run; mock Supabase auth/storage platform tables, fictional users only.",
+  "limits": [
+    "Not Supabase/PostgREST connection-pool, production deployment or real-account validation.",
+    "Deterministic targeted concurrency schedules; not load or stress testing."
+  ],
+  "retained": true
+}

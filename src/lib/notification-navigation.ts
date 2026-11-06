@@ -2,7 +2,7 @@ const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const COMMENT = `(?:#comment-${UUID})?`;
 const CONTENT_DETAIL = new RegExp(`^/(?:products|ideas)/${UUID}${COMMENT}$`);
 const COMMUNITY_DETAIL = new RegExp(`^/community/(?:safety|discussion|activities|feedback)/[a-z0-9]+(?:-[a-z0-9]+)*${COMMENT}$`);
-const FEEDBACK_DETAIL = new RegExp(`^/community/feedback\\?category=wallet&idea=${UUID}(?:&commentOffset=[0-9]+)?${COMMENT}$`);
+const FEEDBACK_DETAIL = new RegExp(`^/community/feedback\\?category=(?:wallet|forum)&idea=${UUID}(?:&commentOffset=[0-9]+)?${COMMENT}$`);
 
 // notification_read returns locale-free paths. Keep the complete path and comment
 // anchor, then let the shared next-intl router add the viewer's current locale.
