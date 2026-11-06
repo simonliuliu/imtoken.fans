@@ -1,6 +1,6 @@
 # 登录页精简
 
-日期：2026-11-06（Asia/Singapore）。基线：`origin/main@50b83de`。分支：`codex/login-page-simplify`。
+日期：2026-11-06（Asia/Singapore）。基线：`origin/main@50b83de`。分支：`codex/login-page-simplify`；[PR #46](https://github.com/simonliuliu/imtoken.fans/pull/46)。
 
 ## 用户反馈与范围
 
