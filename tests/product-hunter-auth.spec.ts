@@ -16,10 +16,15 @@ async function signIn(page: Page) {
 
 test("游客从旧点子链接进入社区登录后，只能提交产品", async ({ page }) => {
   await page.goto("/en/submit?type=idea");
-  await expect(page).toHaveURL(/\/en\/auth\/sign-in\?/);
-  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/en/submit?type=product");
+  await expect(page).toHaveURL("http://127.0.0.1:3000/en/submit/product");
+  const signInLink = page.getByRole("link", { name: "Sign in to submit a product", exact: true });
+  await expect(signInLink).toBeVisible();
+  const signInUrl = new URL((await signInLink.getAttribute("href"))!, "http://127.0.0.1:3000");
+  expect(signInUrl.pathname).toBe("/en/auth/sign-in");
+  expect(signInUrl.searchParams.get("redirect")).toBe("/en/submit/product");
+  await signInLink.click();
   await signIn(page);
-  await expect(page).toHaveURL(/\/en\/submit\?type=product$/);
+  await expect(page).toHaveURL("http://127.0.0.1:3000/en/submit/product");
   await expect(page.getByRole("heading", { name: "Submit a product", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Submit an idea/i })).toHaveCount(0);
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
@@ -34,7 +39,7 @@ test("已有社区会话，延迟加载期间不误显示登录或跳转", async
   await expect(page.getByRole("status").first()).toHaveText("加载中…");
   await expect(page.getByText("登录后才能提交", { exact: true })).toHaveCount(0);
   await expect(page.locator('a[href*="auth/sign-in"]')).toHaveCount(0);
-  expect(new URL(page.url()).pathname).toBe("/zh/submit");
+  expect(new URL(page.url()).pathname).toBe("/zh/submit/product");
   release();
   await expect(page.getByRole("heading", { name: "提交产品", exact: true })).toBeVisible();
   await expect(page.getByText(/Test Reader/).filter({ visible: true }).first()).toBeVisible();
@@ -62,9 +67,17 @@ test("新账号资料慢返回时，旧账号结果不能覆盖共享会话", as
   await seedSession(context);
   let release!: () => void;
   let entered!: () => void;
+  let delivered!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const started = new Promise<void>((resolve) => { entered = resolve; });
-  await page.route("http://127.0.0.1:54329/rest/v1/profiles**", async (route) => { entered(); await gate; await route.continue(); });
+  const profileDelivered = new Promise<void>((resolve) => { delivered = resolve; });
+  await page.route("http://127.0.0.1:54329/rest/v1/profiles**", async (route) => {
+    entered();
+    await gate;
+    const response = await route.fetch();
+    await route.fulfill({ response });
+    delivered();
+  });
   await page.goto("/zh/submit?type=product");
   await started;
   // 模拟另一标签页退出：只删除此本地测试会话并广播 SDK 的退出事件。
@@ -74,10 +87,18 @@ test("新账号资料慢返回时，旧账号结果不能覆盖共享会话", as
     channel.postMessage({ event: "SIGNED_OUT", session: null });
     channel.close();
   });
-  await expect(page).toHaveURL(/\/zh\/auth\/sign-in\?/);
+  await expect(page).toHaveURL("http://127.0.0.1:3000/zh/submit/product");
+  const signInLink = page.getByRole("link", { name: "登录后提交产品", exact: true });
+  await expect(signInLink).toBeVisible();
   release();
+  await profileDelivered;
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(page.getByText(/Test Reader/)).toHaveCount(0);
+  await expect(signInLink).toBeVisible();
+  await signInLink.click();
+  await expect(page).toHaveURL(/\/zh\/auth\/sign-in\?/);
+  expect(new URL(page.url()).searchParams.get("redirect")).toBe("/zh/submit/product");
   await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
-  await expect(page.getByText("Test Reader", { exact: true })).toHaveCount(0);
 });
 
 test("作者身份直接继承社区会话，仍禁止自评", async ({ page, context }) => {
