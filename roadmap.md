@@ -279,3 +279,7 @@ PR #31已将普通帖/产品/反馈发布修复整合至main。本地3000已获�
 2026-11-05 治理 P1：独立复现限制状态查询失败后签到、抽奖可能继续使用特权 RPC；已在独立分支修复为查询失败时阻止写入，覆盖同一检查的评论、投稿、支持及评分，工程与隔离回归通过，独立安全 QA 36 组通过。此批不依赖数据库迁移，精确生产结果见 [PR #44](https://github.com/simonliuliu/imtoken.fans/pull/44)，真实账号验证尚未完成；查询后限制状态改变的事务竞态及 ADM-02 完整警告/封禁仍待后续处理。详见 [任务卡](docs/tasks/blacklist-fail-closed.md)。
 
 2026-11-06 用户线上反馈：登录页精简为居中单栏，保留现有登录和注册入口及简短安全提醒，通用规则补充减少无意义说明；同时修复 320px 顶部导航溢出。隔离 WebKit 9 项、独立安全回归 16 项、中英 1,569 键、lint 和构建通过；真实账号及手机实机尚未验收。此批不依赖数据库迁移，Production 仍待确认，详见 [任务卡](docs/tasks/login-page-simplify.md) 和 [PR #46](https://github.com/simonliuliu/imtoken.fans/pull/46)。论坛反馈入口、治理、交流和通知的原有验收范围保持不变。
+
+## 2026-11-11 框架与依赖安全候选
+
+[PR #48](https://github.com/simonliuliu/imtoken.fans/pull/48) 继续作为草稿：候选修复框架与重定向安全公告，并限定更新开发工具链的 minimatch；`npm ci`、中英 1,569 键、lint、Webpack 构建/TypeScript、3 项解析器兼容回归与独立 QA 通过。全量审计目前 0 critical、11 high、0 moderate，钱包依赖中的两处 Zod 3 尚未解决，审计退出码仍非零，未合并或发布。隔离依赖实验找到清除钱包传递告警的候选路径，但扫码 UI、真实钱包兼容、授权和取消竞态均未完成；不能把实验树的审计结果当成项目已修复。详见 [安全任务卡](docs/tasks/framework-security-2026-11-11.md)。
