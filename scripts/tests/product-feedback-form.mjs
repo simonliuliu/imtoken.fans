@@ -9,9 +9,9 @@ const compiled = compile('../../src/components/product-feedback-form.tsx');
 const draftCode = compile('../../src/lib/feedback-drafts.ts');
 const KIND = 'product-feedback-v2';
 const draftKey = (owner, kind = KIND) => `imtoken-feedback-draft:${owner ?? 'anonymous'}:${kind}`;
-function host({ store = new Map(), owner = 'owner-a', locale = 'zh', resume = false, responses = [], storageFails = false, now = Date.now(), posts = [], searchFails = false, viewer = owner } = {}) {
+function host({ store = new Map(), owner = 'owner-a', locale = 'zh', resume = false, responses = [], storageFails = false, now = Date.now(), posts = [], searchFails = false, viewer = owner, forum = false } = {}) {
   let slots = [], cursor = 0, effects = [], tree, id = 0;
-  const timers = new Map(), calls = [], navigation = [], events = [], translations = new Map();
+  const timers = new Map(), calls = [], readCalls = [], navigation = [], events = [], translations = new Map();
   const state = { storageFails, uuidFails: false };
   const storage = { getItem(key) { if (state.storageFails) throw Error('disabled'); return store.get(key) ?? null; }, setItem(key, value) { if (state.storageFails) throw Error('disabled'); store.set(key, value); }, removeItem(key) { if (state.storageFails) throw Error('disabled'); store.delete(key); } };
   const drafts = {};
@@ -26,14 +26,14 @@ function host({ store = new Map(), owner = 'owner-a', locale = 'zh', resume = fa
   const modules = {
     react: hooks, 'react/jsx-runtime': { jsx, jsxs: jsx },
     'next-intl': { useLocale: () => locale, useTranslations(ns) { if (!translations.has(ns)) translations.set(ns, (key, args) => `${locale}:${ns}.${key}${args ? JSON.stringify(args) : ''}`); return translations.get(ns); } },
-    'next/navigation': { useSearchParams: () => new URLSearchParams(resume ? 'resume=1' : '') },
+    'next/navigation': { useSearchParams: () => new URLSearchParams(`${resume ? 'resume=1&' : ''}${forum ? 'module=forum' : ''}`) },
     '@/components/auth-loading': { AuthLoading: 'loading' },
     '@/lib/auth-context': { useAuth: () => ({ user: owner ? { id: owner } : null, loading: false, sessionEpoch: 0 }) },
-    '@/lib/auth-navigation': { getSignInHref: () => '/sign-in?resume=1' },
+    '@/lib/auth-navigation': { getSignInHref: (target) => `/sign-in?redirect=${encodeURIComponent(target)}` },
     '@/lib/feedback-drafts': drafts,
     '@/i18n/navigation': { Link: 'a', useRouter: () => ({ push: (href) => navigation.push(href) }) },
-    '@/app/actions/feedback': { async writeFeedback(action, payload) { calls.push({ action, payload }); const r = responses.shift(); if (r instanceof Error) throw r; return typeof r === 'function' ? r() : r; }, async readFeedback() { if (searchFails) throw Error('offline'); return { ok: true, data: { posts, viewer: { user_id: viewer } } }; } },
-    '@/lib/feedback': { FEEDBACK_MODULES: ['wallet', 'transfer', 'browser', 'other'], FEEDBACK_CHANGED: 'feedback-changed' },
+    '@/app/actions/feedback': { async writeFeedback(action, payload) { calls.push({ action, payload }); const r = responses.shift(); if (r instanceof Error) throw r; return typeof r === 'function' ? r() : r; }, async readFeedback(query) { readCalls.push(query); if (searchFails) throw Error('offline'); return { ok: true, data: { posts, viewer: { user_id: viewer } } }; } },
+    '@/lib/feedback': { FEEDBACK_MODULES: ['wallet', 'transfer', 'browser', 'other', 'forum'], FEEDBACK_CHANGED: 'feedback-changed' },
     './community-compose.module.css': { submitError: 'error' },
   };
   const exports = {};
@@ -41,7 +41,7 @@ function host({ store = new Map(), owner = 'owner-a', locale = 'zh', resume = fa
   vm.runInNewContext(compiled, { exports, require: (name) => { assert(name in modules, name); return modules[name]; }, URLSearchParams,
     crypto: { randomUUID() { if (state.uuidFails) throw Error('uuid'); return `11111111-1111-1111-1111-${String(++id).padStart(12, '0')}`; } },
     window: { setTimeout: setTimer, clearTimeout: (id) => timers.delete(id), dispatchEvent: (e) => events.push(e) },
-    setTimeout: setTimer, clearTimeout: (id) => timers.delete(id), CustomEvent: class { constructor(type) { this.type = type; } },
+    setTimeout: setTimer, clearTimeout: (id) => timers.delete(id), CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
   });
   function walk(n, visit) { if (Array.isArray(n)) return n.forEach((i) => walk(i, visit)); if (!n || typeof n !== 'object' || !n.props) return; visit(n); walk(n.props.children, visit); }
   function render() { cursor = 0; effects = []; const outer = exports.ProductFeedbackForm(); tree = outer.type(outer.props); walk(tree, (n) => { if (n.props.ref) n.props.ref.current = { focus() {}, scrollIntoView() {} }; }); effects.forEach((f) => f()); }
@@ -51,7 +51,7 @@ function host({ store = new Map(), owner = 'owner-a', locale = 'zh', resume = fa
   function edit(type, value, index = 0) { all((n) => n.type === type)[index].props.onChange({ target: { value } }); render(); }
   render();
   async function tick() { const ts = [...timers.values()]; timers.clear(); for (const fn of ts) await fn(); render(); }
-  return { store, state, drafts, calls, navigation, events, render, tick, all, find, text, edit,
+  return { store, state, drafts, calls, readCalls, navigation, events, render, tick, all, find, text, edit,
     async init() { await tick(); return this; },
     fill() { edit('input', 'Feedback title'); edit('textarea', 'Detailed reproducible issue'); },
     submit: () => find((n) => n.type === 'form').props.onSubmit({ preventDefault() {} }),
@@ -96,8 +96,16 @@ await test('unknown result locks original payload against edits and locale switc
   h.edit('input', 'Changed title'); assert.equal(h.title, 'Feedback title');
   const retry = await host({ store: h.store, locale: 'en', responses: [ok] }).init(); assert(retry.locked); await retry.submit(); retry.render();
   assert.deepEqual(JSON.parse(JSON.stringify(retry.calls[0].payload)), JSON.parse(JSON.stringify(h.calls[0].payload)));
-  assert(h.calls[0].payload.description.startsWith('zh:')); assert.equal(retry.navigation.length, 1); assert(!h.store.has(draftKey('owner-a')));
+  assert.equal(h.calls[0].payload.description, 'Detailed reproducible issue'); assert.equal(h.calls[0].payload.kind, 'bug'); assert.equal(retry.navigation.length, 1); assert(!h.store.has(draftKey('owner-a')));
   await retry.submit(); assert.equal(retry.calls.length, 1); assert(!h.store.has(draftKey('owner-a')));
+});
+await test('previously saved serialized product request retries unchanged across languages', async () => {
+  const h = host();
+  const pending = { id: '11111111-1111-1111-1111-111111111111', title: 'Old feedback', description: 'zh:old kind\n\nOld description\n\nSteps: original', module: 'wallet', expected_user_id: 'owner-a' };
+  h.drafts.saveFeedbackDraft(KIND, 'owner-a', { form: { title: 'Old feedback', body: 'Old description', module: 'wallet', kind: 'bug', details: { steps: 'original' } }, pending }, { retainUntilResolved: true });
+  const retry = await host({ store: h.store, locale: 'en', responses: [ok] }).init();
+  assert(retry.locked); await retry.submit();
+  assert.deepEqual(JSON.parse(JSON.stringify(retry.calls[0].payload)), pending);
 });
 await test('transport throw and malformed success keep immutable persisted request', async () => {
   for (const response of [Error('offline'), { ok: true, data: {} }]) {
@@ -135,10 +143,10 @@ await test('unknown outcome followed by sign-in rejection must not release origi
 await test('first-attempt expired session keeps editable owner draft for sign-in', async () => {
   const h = await host({ responses: [{ ok: false, code: 'sign_in', error: 'Sign in again' }] }).init(); h.fill(); await h.submit(); h.render(); assert(!h.locked); await h.submit(); assert.equal(h.calls.length, 1); assert(h.navigation[0].includes('sign-in'));
 });
-await test('suggestion fields persist; original serialized suggestion survives translated retry', async () => {
+await test('suggestion fields persist; original structured suggestion survives translated retry', async () => {
   const h = await host({ responses: [fail] }).init();
   h.find((n) => n.type === 'button' && h.text(n).includes('communitySubmit.suggestionType')).props.onClick(); h.render(); h.fill(); h.edit('textarea', 'Useful proposal', 2); await h.submit();
-  const retry = await host({ store: h.store, locale: 'en', responses: [ok] }).init(); assert.equal(retry.all((n) => n.type === 'textarea')[2].props.value, 'Useful proposal'); await retry.submit(); assert.equal(retry.calls[0].payload.description, h.calls[0].payload.description); assert(retry.calls[0].payload.description.includes('Useful proposal'));
+  const retry = await host({ store: h.store, locale: 'en', responses: [ok] }).init(); assert.equal(retry.all((n) => n.type === 'textarea')[2].props.value, 'Useful proposal'); await retry.submit(); assert.deepEqual(JSON.parse(JSON.stringify(retry.calls[0].payload)), JSON.parse(JSON.stringify(h.calls[0].payload))); assert.equal(retry.calls[0].payload.description, 'Detailed reproducible issue'); assert.equal(retry.calls[0].payload.details.proposal, 'Useful proposal');
 });
 await test('conflict keeps snapshot locked and offers original feedback link', async () => {
   const h = await host({ responses: [{ ok: false, code: 'conflict', error: 'Conflict' }] }).init(); h.fill(); await h.submit(); h.render(); assert(h.locked); assert(h.all((n) => n.type === 'a').some((n) => n.props.href.includes(`idea=${h.calls[0].payload.id}`)));
@@ -189,5 +197,44 @@ await test('initial read failure blocks overwriting prior pending until explicit
 await test('corrupt draft recovery requires explicit reload before editing is enabled', async () => {
   const h = await host({ store: new Map([[draftKey('owner-a'), '{broken']]) }).init(); assert(h.locked); h.fill(); assert.equal(h.title, '');
   h.find((n) => n.type === 'button' && h.text(n).includes('reloadDraft')).props.onClick(); h.render(); await h.tick(); assert(!h.locked); h.fill(); assert.equal(h.title, 'Feedback title');
+});
+await test('forum entry preselects forum, sends structured bug details, and returns to forum category', async () => {
+  const h = await host({ forum: true, responses: [ok] }).init(); h.fill();
+  h.edit('input', '2026.11', 1); h.edit('textarea', 'Open notifications, then click a reply', 1);
+  await h.submit();
+  assert.equal(h.calls[0].payload.module, 'forum'); assert.equal(h.calls[0].payload.kind, 'bug'); assert.equal(h.calls[0].payload.description, 'Detailed reproducible issue');
+  assert.equal(h.calls[0].payload.details.steps, 'Open notifications, then click a reply');
+  assert.equal(h.navigation[0], '/community/feedback?category=forum&idea=published');
+  assert.equal(h.events[0].detail.module, 'forum');
+});
+await test('forum search is scoped and ignores simultaneous product draft', async () => {
+  const store = new Map(); const product = await host({ store }).init(); product.fill();
+  const forum = await host({ store, forum: true }).init(); assert.equal(forum.title, ''); forum.fill(); await forum.tick();
+  assert(forum.readCalls.length); assert(forum.readCalls.every((query) => query.module === 'forum'));
+  assert(store.has(draftKey('owner-a'))); assert(store.has(draftKey('owner-a', 'forum-feedback-v1')));
+});
+await test('product search excludes forum records at the RPC boundary', async () => {
+  const h = await host().init(); h.fill(); await h.tick(); assert(h.readCalls.length); assert(h.readCalls.every((query) => query.module === 'product'));
+});
+await test('anonymous forum draft resumes with scope and structured suggestion fields', async () => {
+  const h = await host({ owner: null, forum: true }).init(); h.fill();
+  h.find((n) => n.type === 'button' && h.text(n).includes('suggestionType')).props.onClick(); h.render();
+  h.edit('textarea', 'Help moderators review a report', 1); await h.submit();
+  assert(decodeURIComponent(h.navigation[0]).includes('/submit/feedback?resume=1&module=forum'));
+  const signed = await host({ store: h.store, owner: 'owner-a', forum: true, resume: true, responses: [ok] }).init();
+  assert.equal(signed.title, 'Feedback title'); await signed.submit();
+  assert.equal(signed.calls[0].payload.kind, 'suggestion'); assert.equal(signed.calls[0].payload.details.scenario, 'Help moderators review a report');
+});
+await test('forum unknown outcome retains original structured payload across language change', async () => {
+  const h = await host({ forum: true, responses: [fail] }).init(); h.fill(); h.edit('textarea', 'Precise steps', 1); await h.submit();
+  const retry = await host({ forum: true, store: h.store, locale: 'en', responses: [ok] }).init(); await retry.submit();
+  assert.deepEqual(JSON.parse(JSON.stringify(retry.calls[0].payload)), JSON.parse(JSON.stringify(h.calls[0].payload)));
+  assert.equal(retry.navigation[0], '/community/feedback?category=forum&idea=published');
+});
+await test('changing feedback kind clears incompatible structured fields', async () => {
+  const h = await host({ forum: true, responses: [ok] }).init(); h.fill(); h.edit('textarea', 'Old bug steps', 1);
+  h.find((n) => n.type === 'button' && h.text(n).includes('suggestionType')).props.onClick(); h.render();
+  h.edit('textarea', 'Suggested scenario', 1); await h.submit();
+  assert.equal(h.calls[0].payload.details.steps, undefined); assert.equal(h.calls[0].payload.details.scenario, 'Suggested scenario');
 });
 console.log(`${passed} ProductFeedbackForm regression cases passed (actual handlers, mocked services).`);

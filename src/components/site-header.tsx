@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { Suspense, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import NextLink from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -39,7 +40,7 @@ export function SiteHeader() {
         </nav>
         <div className="fans-header-tools">
           <LanguageSwitcher />
-          <Link href={submitHref} aria-label={t("submit")} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>
+          <Suspense fallback={<Link href={submitHref} className="community-button community-compose-compact">{t("submit")}<span aria-hidden>＋</span></Link>}><PublishLink href={submitHref} feedback={currentSection === "feedback"} label={t("submit")} /></Suspense>
           {!loading && user && <NotificationBell key={`${user.id}:${sessionEpoch}`} />}
           <div className="fans-desktop-account">
             {loading ? <AuthLoading compact /> : user ? <><UserMenu name={user.name} avatarUrl={user.avatarUrl} isAdmin={isAdmin} onSignOut={signOut} /></> : <Link href={signInHref} className="fans-signin">{t("signIn")}</Link>}
@@ -60,4 +61,10 @@ export function SiteHeader() {
       </div>
     </header>
   );
+}
+
+function PublishLink({ href, feedback, label }: { href: string; feedback: boolean; label: string }) {
+  const params = useSearchParams();
+  const target = feedback && params.get("category") === "forum" ? "/submit/feedback?module=forum" : href;
+  return <Link href={target} aria-label={label} className="community-button community-compose-compact">{label}<span aria-hidden>＋</span></Link>;
 }

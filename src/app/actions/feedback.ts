@@ -12,7 +12,7 @@ const configured = () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process
 
 async function failure(error: { message?: string; code?: string }): Promise<{ ok: false; error: string; code: string }> {
   const t = await getTranslations("feedbackErrors");
-  const known = ["sign_in", "restricted", "forbidden", "invalid", "conflict", "not_found", "parent", "merge_blocked"] as const;
+  const known = ["sign_in", "restricted", "forbidden", "invalid", "conflict", "not_found", "parent", "merge_blocked", "scope"] as const;
   const kind = known.find((key) => error.message?.includes(`feedback_${key}`));
   if (kind) return { ok: false, code: kind, error: t(kind) };
   if (["PGRST202", "PGRST205", "42P01", "42883"].includes(error.code ?? "")) return { ok: false, code: "migration", error: t("migration") };
@@ -30,6 +30,13 @@ function validPayload(action: Action, p: Record<string, unknown>): boolean {
   if (action === "create" || action === "edit") {
     if (!validText(p.title, 120) || !validText(p.description, 5000) || !FEEDBACK_MODULES.includes(p.module as never)) return false;
   }
+  if (action === "create" && (p.kind != null || p.details != null || p.module === "forum")) {
+    if (!["bug", "suggestion"].includes(String(p.kind)) || !p.details || typeof p.details !== "object" || Array.isArray(p.details)) return false;
+    const allowed = p.kind === "bug" ? ["appVersion", "device", "steps", "expected", "actual"] : ["scenario", "proposal", "impact"];
+    if (Object.entries(p.details).some(([key, value]) => !allowed.includes(key) || typeof value !== "string" || value.length > 2000)) return false;
+    const details = p.details as Record<string, string>;
+    if (details.device && !["ios", "android", "browserExtension", "other"].includes(details.device)) return false;
+  }
   if (action === "edit" && (!validVersion(p.version) || !FEEDBACK_STATES.includes(p.status as never) || !FEEDBACK_MARKS.includes(p.mark as never) || !["published", "hidden"].includes(String(p.visibility)))) return false;
   if (action === "comment" && (!validText(p.body, 2000) || typeof p.request_id !== "string" || !UUID.test(p.request_id) || (p.parent_id != null && (typeof p.parent_id !== "string" || !UUID.test(p.parent_id))))) return false;
   if ((action === "vote" || action === "comment_vote") && typeof p.supported !== "boolean") return false;
@@ -40,7 +47,7 @@ function validPayload(action: Action, p: Record<string, unknown>): boolean {
 
 export async function readFeedback(query: FeedbackQuery = {}): Promise<FeedbackResult<FeedbackData>> {
   if (!configured()) return configFailure();
-  if (query.id != null && !UUID.test(query.id) || (query.query?.length ?? 0) > 120 || !["all", ...FEEDBACK_MODULES].includes(query.module ?? "all") || !["all", ...FEEDBACK_STATES].includes(query.status ?? "all") || !["latest", "oldest", "popular"].includes(query.sort ?? "latest") || !Number.isInteger(query.offset ?? 0) || !Number.isInteger(query.commentOffset ?? 0) || (query.offset ?? 0) < 0 || (query.commentOffset ?? 0) < 0) return failure({ message: "feedback_invalid" });
+  if (query.id != null && !UUID.test(query.id) || (query.query?.length ?? 0) > 120 || !["all", "product", ...FEEDBACK_MODULES].includes(query.module ?? "all") || !["all", ...FEEDBACK_STATES].includes(query.status ?? "all") || !["latest", "oldest", "popular"].includes(query.sort ?? "latest") || !Number.isInteger(query.offset ?? 0) || !Number.isInteger(query.commentOffset ?? 0) || (query.offset ?? 0) < 0 || (query.commentOffset ?? 0) < 0) return failure({ message: "feedback_invalid" });
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("feedback_read", { p_id: query.id ?? null, p_query: query.query?.trim() ?? "", p_module: query.module ?? "all", p_status: query.status ?? "all", p_sort: query.sort ?? "latest", p_offset: query.offset ?? 0, p_comment_offset: query.commentOffset ?? 0 });
