@@ -98,6 +98,18 @@ await check('expired verification leases can be reclaimed and old tokens cannot 
   assert.equal((await service(() => db.query('select feedback_media_release_validation($1,$2,$3) r', [id, ids.a, firstLease.token]))).rows[0].r, false);
   assert.equal((await service(() => db.query('select feedback_media_release_validation($1,$2,$3) r', [id, ids.a, secondLease.token]))).rows[0].r, true);
 });
+await check('per-file and per-account verification limits bound repeated expensive validation', async () => {
+  const begin = (id) => service(() => db.query('select feedback_media_begin_validation($1,$2) r', [id, ids.member])).then((r) => r.rows[0].r);
+  const release = (id, token) => service(() => db.query('select feedback_media_release_validation($1,$2,$3)', [id, ids.member, token]));
+  const one = randomUUID(), two = randomUUID(), three = randomUUID();
+  for (const id of [one, two, three]) await reserve('member', id, randomUUID());
+  for (let i = 0; i < 5; i++) { const lease = await begin(one); await release(one, lease.token); }
+  await assert.rejects(() => begin(one), /feedback_media_quota/);
+  for (let i = 0; i < 5; i++) { const lease = await begin(two); await release(two, lease.token); }
+  await assert.rejects(() => begin(three), /feedback_media_quota/);
+  await db.query("update feedback_media_validation_rates set window_started=clock_timestamp()-interval '6 minutes' where owner_id=$1", [ids.member]);
+  assert.equal((await begin(three)).state, 'validating');
+});
 await check('a transaction started before expiry cannot commit an expired verification lease', async () => {
   const id = randomUUID(); await reserve('a', id, randomUUID());
   const lease = (await service(() => db.query('select feedback_media_begin_validation($1,$2) r', [id, ids.a]))).rows[0].r;

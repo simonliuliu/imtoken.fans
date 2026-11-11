@@ -39,6 +39,7 @@ create table public.feedback_media_uploads (
   verified_duration numeric check (verified_duration is null or verified_duration > 0 and verified_duration <= 120),
   validation_token uuid,
   validation_lease_until timestamptz,
+  validation_attempts integer not null default 0 check (validation_attempts between 0 and 5),
   cleanup_token uuid,
   cleanup_lease_until timestamptz,
   cleanup_attempts integer not null default 0 check (cleanup_attempts >= 0),
@@ -65,6 +66,13 @@ create index feedback_media_draft on public.feedback_media_uploads(owner_id, dra
   where state <> 'cleaned';
 alter table public.feedback_media_uploads enable row level security;
 revoke all on public.feedback_media_uploads from public, anon, authenticated, service_role;
+create table public.feedback_media_validation_rates (
+  owner_id uuid primary key references public.profiles(id),
+  window_started timestamptz not null,
+  attempts integer not null check (attempts > 0)
+);
+alter table public.feedback_media_validation_rates enable row level security;
+revoke all on public.feedback_media_validation_rates from public, anon, authenticated, service_role;
 
 -- The policy reveals only whether this exact generated staging key is currently
 -- writable by its owner. There is deliberately no client SELECT/UPDATE/DELETE
@@ -168,7 +176,7 @@ grant execute on function public.feedback_media_owned(uuid) to authenticated;
 -- checks and serializes this transition with feedback and cancellation writes.
 create function public.feedback_media_begin_validation(p_id uuid, p_owner uuid)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
-declare media public.feedback_media_uploads; actor public.profiles; token uuid;
+declare media public.feedback_media_uploads; actor public.profiles; token uuid; recent_attempts integer;
 begin
   perform pg_advisory_xact_lock(824024);
   select * into actor from public.profiles where id = p_owner for share;
@@ -184,9 +192,17 @@ begin
   if media.state <> 'reserved' and not (media.state = 'validating' and media.validation_lease_until <= clock_timestamp()) then
     raise exception 'feedback_media_conflict';
   end if;
+  if media.validation_attempts >= 5 then raise exception 'feedback_media_quota'; end if;
+  insert into public.feedback_media_validation_rates(owner_id, window_started, attempts)
+    values(p_owner, clock_timestamp(), 1)
+    on conflict(owner_id) do update set
+      attempts = case when feedback_media_validation_rates.window_started <= clock_timestamp() - interval '5 minutes' then 1 else feedback_media_validation_rates.attempts + 1 end,
+      window_started = case when feedback_media_validation_rates.window_started <= clock_timestamp() - interval '5 minutes' then clock_timestamp() else feedback_media_validation_rates.window_started end
+    returning attempts into recent_attempts;
+  if recent_attempts > 10 then raise exception 'feedback_media_quota'; end if;
   token := gen_random_uuid();
   update public.feedback_media_uploads set state = 'validating', validation_token = token,
-    validation_lease_until = clock_timestamp() + interval '2 minutes' where id = media.id;
+    validation_lease_until = clock_timestamp() + interval '2 minutes', validation_attempts = validation_attempts + 1 where id = media.id;
   return jsonb_build_object('id', media.id, 'state', 'validating', 'token', token,
     'bucket', media.bucket_id, 'staging_path', media.staging_path, 'verified_path', media.verified_path,
     'type', media.declared_type, 'size', media.declared_size);
