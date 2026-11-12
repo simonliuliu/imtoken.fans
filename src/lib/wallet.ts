@@ -5,6 +5,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 // 挑战码不落库，而是签名后放进一个短期 httpOnly cookie 里，服务端用 HMAC 验证没有被篡改。
 export const WALLET_NONCE_COOKIE = "imaihunt_wallet_nonce";
 const NONCE_TTL_MS = 5 * 60 * 1000;
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function getSecret(): string {
   const secret = process.env.WALLET_AUTH_SECRET;
@@ -97,9 +98,23 @@ export function verifyChallengeCookieValue(
     return null;
   }
 
+  if (!challenge || typeof challenge !== "object") return null;
   if (challenge.address !== address.toLowerCase()) return null;
-  if (Date.now() - challenge.issuedAt > NONCE_TTL_MS) return null;
+  if (typeof challenge.nonce !== "string" || !/^[0-9a-f]{32}$/.test(challenge.nonce)) return null;
+  if (!Number.isSafeInteger(challenge.issuedAt)) return null;
+  const age = Date.now() - challenge.issuedAt;
+  if (age > NONCE_TTL_MS || age < -MAX_CLOCK_SKEW_MS) return null;
   return challenge;
+}
+
+/** Stable, purpose-separated identifier; never stores the cookie or signature. */
+export function walletNonceConsumptionKey(challenge: WalletChallenge): string {
+  return createHmac("sha256", getSecret())
+    .update("wallet-nonce-consumption:v1\0")
+    .update(challenge.address.toLowerCase())
+    .update("\0")
+    .update(challenge.nonce)
+    .digest("hex");
 }
 
 export function walletSyntheticEmail(address: string): string {

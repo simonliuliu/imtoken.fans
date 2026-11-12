@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { isAddress, verifyMessage } from "viem";
 import { routing } from "@/i18n/routing";
-import { buildChallengeMessage, verifyChallengeCookieValue, walletSyntheticEmail, WALLET_NONCE_COOKIE } from "@/lib/wallet";
+import { buildChallengeMessage, verifyChallengeCookieValue, walletNonceConsumptionKey, walletSyntheticEmail, WALLET_NONCE_COOKIE } from "@/lib/wallet";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -73,6 +73,23 @@ export async function POST(request: Request) {
       { error: err instanceof Error ? err.message : t("adminKeyMissing") },
       { status: 500 }
     );
+  }
+
+  // The browser deleting its cookie cannot revoke a copied or in-flight request.
+  // Consume the verified nonce atomically before creating users or sessions.
+  try {
+    const { data: consumed, error } = await admin.rpc("consume_wallet_sign_in_nonce", {
+      p_nonce_key: walletNonceConsumptionKey(challenge),
+      p_issued_at_ms: challenge.issuedAt,
+    });
+    if (error || (consumed !== true && consumed !== false)) {
+      return NextResponse.json({ error: t("nonceVerifyFailed") }, { status: 503 });
+    }
+    if (!consumed) {
+      return NextResponse.json({ error: t("nonceExpired") }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: t("nonceVerifyFailed") }, { status: 503 });
   }
 
   const { data: existingProfile } = await admin

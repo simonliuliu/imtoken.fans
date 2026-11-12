@@ -40,6 +40,7 @@ function load(file, imports = {}, globals = {}) {
 const cookieJar = new Map();
 const tokens = new Map();
 const profiles = new Map();
+const consumedNonces = new Set();
 let loggedIn = null;
 let issued = 0;
 const cookies = {
@@ -51,6 +52,14 @@ const wallet = load('src/lib/wallet.ts', { 'server-only': {} }, {
   process: { env: { WALLET_AUTH_SECRET: randomBytes(32).toString('hex') } },
 });
 const admin = {
+  rpc: async (name, args) => {
+    assert.equal(name, 'consume_wallet_sign_in_nonce');
+    assert.match(args.p_nonce_key, /^[0-9a-f]{64}$/);
+    assert(Number.isSafeInteger(args.p_issued_at_ms));
+    if (consumedNonces.has(args.p_nonce_key)) return { data: false, error: null };
+    consumedNonces.add(args.p_nonce_key);
+    return { data: true, error: null };
+  },
   from: () => ({
     select: () => ({
       eq: (_, address) => ({

@@ -2,7 +2,7 @@
 // All identities, cookies, session writes and database clients are synthetic.
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -41,14 +41,18 @@ function load(file, imports = {}, globals = {}) {
 }
 
 const account = privateKeyToAccount(generatePrivateKey());
+const walletSecret = randomBytes(32).toString('hex');
 const wallet = load('src/lib/wallet.ts', { 'server-only': {} }, {
-  process: { env: { WALLET_AUTH_SECRET: randomBytes(32).toString('hex') } },
+  process: { env: { WALLET_AUTH_SECRET: walletSecret } },
 });
 const requests = new AsyncLocalStorage();
 const issuedTokens = new Map();
+const consumedNonces = new Set();
 let links = 0;
 let sessions = 0;
 let barrier = null;
+let nonceStoreMode = 'normal';
+let linkMode = 'normal';
 const verifySignature = async options => {
   const valid = await viem.verifyMessage(options);
   if (barrier) {
@@ -59,6 +63,21 @@ const verifySignature = async options => {
   return valid;
 };
 const admin = {
+  rpc: async (name, args) => {
+    assert.equal(name, 'consume_wallet_sign_in_nonce');
+    assert.match(args.p_nonce_key, /^[0-9a-f]{64}$/);
+    assert(Number.isSafeInteger(args.p_issued_at_ms));
+    if (nonceStoreMode === 'error') return { data: null, error: { message: 'synthetic store error' } };
+    if (nonceStoreMode === 'throw') throw new Error('synthetic store exception');
+    if (nonceStoreMode === 'invalid') return { data: null, error: null };
+    if (nonceStoreMode === 'commit-then-error') {
+      consumedNonces.add(args.p_nonce_key);
+      return { data: null, error: { message: 'synthetic lost response' } };
+    }
+    if (consumedNonces.has(args.p_nonce_key)) return { data: false, error: null };
+    consumedNonces.add(args.p_nonce_key);
+    return { data: true, error: null };
+  },
   from: table => {
     assert.equal(table, 'profiles');
     return { select: () => ({ eq: (column, value) => {
@@ -72,6 +91,7 @@ const admin = {
     generateLink: async ({ email }) => {
       assert.equal(email, wallet.walletSyntheticEmail(account.address));
       links += 1;
+      if (linkMode === 'error') return { data: null, error: { message: 'synthetic link failure' } };
       const token = randomUUID();
       issuedTokens.set(token, email);
       return { data: { properties: { hashed_token: token } }, error: null };
@@ -125,6 +145,30 @@ function check(name, observed, ok) {
   if (!ok) findings.push(name);
 }
 
+function signSyntheticCookie(challengeValue) {
+  const payload = Buffer.from(JSON.stringify(challengeValue)).toString('base64url');
+  const mac = createHmac('sha256', walletSecret).update(payload).digest('base64url');
+  return `${payload}.${mac}`;
+}
+
+const validationCase = await challenge();
+const validationChallenge = wallet.verifyChallengeCookieValue(validationCase.cookie, account.address);
+assert(validationChallenge);
+const stableKey = wallet.walletNonceConsumptionKey(validationChallenge);
+assert.match(stableKey, /^[0-9a-f]{64}$/);
+assert.equal(wallet.walletNonceConsumptionKey(validationChallenge), stableKey);
+const differentNonce = validationChallenge.nonce === 'f'.repeat(32) ? '0'.repeat(32) : 'f'.repeat(32);
+assert.notEqual(wallet.walletNonceConsumptionKey({ ...validationChallenge, nonce: differentNonce }), stableKey);
+for (const [name, override] of [
+  ['expired', { issuedAt: Date.now() - 6 * 60 * 1000 }],
+  ['future', { issuedAt: Date.now() + 6 * 60 * 1000 }],
+  ['invalid-time', { issuedAt: 'not-a-time' }],
+  ['invalid-nonce', { nonce: 'not-a-random-nonce' }],
+]) {
+  const malformed = signSyntheticCookie({ ...validationChallenge, ...override });
+  check(`challenge-${name}`, {}, wallet.verifyChallengeCookieValue(malformed, account.address) === null);
+}
+
 const browserCase = await challenge();
 const browserBefore = sessions;
 const browserFirst = await call(verify, browserCase.body, browserCase.cookie);
@@ -138,6 +182,13 @@ const first = await call(verify, sequentialCase.body, sequentialCase.cookie);
 const replay = await call(verify, sequentialCase.body, sequentialCase.cookie);
 check('same-cookie-sequential-replay', { statuses: [first.status, replay.status], mockSessionWrites: sessions - sequentialBefore.sessions, mockLinks: links - sequentialBefore.links },
   first.status === 200 && replay.status >= 400 && replay.status < 500 && sessions - sequentialBefore.sessions === 1 && links - sequentialBefore.links === 1);
+
+const casingCase = await challenge();
+const casingBefore = { sessions, links };
+const lowercaseFirst = await call(verify, { ...casingCase.body, address: account.address.toLowerCase() }, casingCase.cookie);
+const checksumReplay = await call(verify, casingCase.body, casingCase.cookie);
+check('same-challenge-address-casing', { statuses: [lowercaseFirst.status, checksumReplay.status], mockSessionWrites: sessions - casingBefore.sessions, mockLinks: links - casingBefore.links },
+  lowercaseFirst.status === 200 && checksumReplay.status >= 400 && checksumReplay.status < 500 && sessions - casingBefore.sessions === 1 && links - casingBefore.links === 1);
 
 const aliasCase = await challenge();
 const aliasBefore = { sessions, links };
@@ -179,6 +230,34 @@ check('wrong-signer-control', { status: wrong.status, mockSessionWrites: session
 const validAfterWrong = await call(verify, invalidCase.body, invalidCase.cookie);
 check('wrong-signer-does-not-consume-valid-challenge', { status: validAfterWrong.status, mockSessionWrites: sessions - invalidBefore.sessions, mockLinks: links - invalidBefore.links },
   validAfterWrong.status === 200 && sessions - invalidBefore.sessions === 1 && links - invalidBefore.links === 1);
+
+for (const mode of ['error', 'throw', 'invalid']) {
+  const unavailableCase = await challenge();
+  const unavailableBefore = { sessions, links };
+  nonceStoreMode = mode;
+  const unavailable = await call(verify, unavailableCase.body, unavailableCase.cookie);
+  nonceStoreMode = 'normal';
+  check(`nonce-store-${mode}-fails-closed`, { status: unavailable.status, mockSessionWrites: sessions - unavailableBefore.sessions, mockLinks: links - unavailableBefore.links },
+    unavailable.status === 503 && sessions - unavailableBefore.sessions === 0 && links - unavailableBefore.links === 0);
+}
+
+const lostResponseCase = await challenge();
+const lostResponseBefore = { sessions, links };
+nonceStoreMode = 'commit-then-error';
+const lostResponse = await call(verify, lostResponseCase.body, lostResponseCase.cookie);
+nonceStoreMode = 'normal';
+const lostResponseRetry = await call(verify, lostResponseCase.body, lostResponseCase.cookie);
+check('committed-claim-with-lost-response-fails-closed', { statuses: [lostResponse.status, lostResponseRetry.status], mockSessionWrites: sessions - lostResponseBefore.sessions, mockLinks: links - lostResponseBefore.links },
+  lostResponse.status === 503 && lostResponseRetry.status >= 400 && lostResponseRetry.status < 500 && sessions - lostResponseBefore.sessions === 0 && links - lostResponseBefore.links === 0);
+
+const downstreamCase = await challenge();
+const downstreamBefore = { sessions, links };
+linkMode = 'error';
+const downstreamFailure = await call(verify, downstreamCase.body, downstreamCase.cookie);
+linkMode = 'normal';
+const retryAfterFailure = await call(verify, downstreamCase.body, downstreamCase.cookie);
+check('failed-auth-does-not-restore-consumed-nonce', { statuses: [downstreamFailure.status, retryAfterFailure.status], mockSessionWrites: sessions - downstreamBefore.sessions, mockLinks: links - downstreamBefore.links },
+  downstreamFailure.status === 500 && retryAfterFailure.status >= 400 && retryAfterFailure.status < 500 && sessions - downstreamBefore.sessions === 0 && links - downstreamBefore.links === 1);
 
 if (findings.length) {
   process.stderr.write(JSON.stringify({ result: 'FAIL', reason: 'A valid signed nonce was not consumed once by the route', failedScenarios: findings }) + '\n');
