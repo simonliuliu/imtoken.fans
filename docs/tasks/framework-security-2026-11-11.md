@@ -56,3 +56,11 @@
 - 独立 QA 复测实际脚本的四个场景及源码 SHA256 `025480e8efc1caed4e467ec343a3f9b46682fe103e28593bd907ef983456de52`；用错误临时签名者、向模拟 relay 注入虚构挑战明文、清理期间未处理拒绝三个反例分别验证测试会失败。初版在清理前输出成功且只检查前端 session，QA 指出后已改为在清理后检查，确认双方 session 删除，并停止 SDK heartbeat 后自然退出。专项 lint 通过。
 - 复测脚本为 `tests/experiments/walletconnect-universal-offline.mjs`；现有独立包目录是 `/private/tmp/imtoken-wallet-probe.a70IT3`。从项目根目录以 `WALLETCONNECT_TEST_DEPS_ROOT=/private/tmp/imtoken-wallet-probe.a70IT3 sandbox-exec -p '(version 1) (allow default) (deny network*) (allow network-inbound (local ip "localhost:*")) (allow network-outbound (remote ip "localhost:*"))' ./node_modules/node/bin/node tests/experiments/walletconnect-universal-offline.mjs` 运行。临时目录不属于仓库，重建时需隔离安装并核对这两个 SDK 的 2.26.0 版本。
 - 模拟 relay 只实现本实验需要的消息，不验证生产 relay 的鉴权、重试、时序和多节点行为；只确认所测 session 删除，不保证 pairing 记录或全部 SDK 后台状态清理。真实钱包、扫码、手机深链、站点 nonce/verify、取消后的服务端会话竞态、二维码隐私及无障碍均未验收。现有钱包依赖中的两个 Zod 3 与 11 个 high 审计传播节点未改变，审计仍非零；PR #48 继续为草稿，不能合并或发布。
+
+## 2026-11-12 钱包 nonce 防重放检查
+
+- 独立安全 QA 发现主线 `67da8fe09c375245eac858caec415adc28390613` 已有的 P2 设计缺口：钱包 nonce 使用短期 HMAC cookie，verify 删除当前响应的 cookie，但没有在共享服务端原子记录该 nonce 已消费。持有有效期内同一 cookie 和对应有效签名，或能让浏览器重复发送二者的请求，可以重复通过应用自身的签名校验并再次进入生成 OTP 的流程。普通浏览器收到删除 cookie 响应后的重试被拒；仅有签名、任意地址或正常重试不足以证明账户接管。没有线上攻击或滥用证据。
+- 隔离检查使用真实 HMAC、临时随机 EOA 签名、独立请求 cookie 副本和虚构 Supabase：顺序与并发重复请求均到达虚构 OTP 并各模拟两次 session 写入；真实 GoTrue 的令牌轮换与并发结果未验证，不能据此声称线上两次会话必定成功。错误签名没有产生虚构 session，错误签名后同一挑战的正确签名仍可成功。
+- 当前候选只加固 cookie 解析：要求恰好两段，附加 `.suffix` 的别名被拒；原 cookie 的顺序及并发重放仍未修复。真实身份流程 5 项、受影响 lint 与 TypeScript 检查通过。`tests/experiments/wallet-nonce-replay-check.mjs` 是明确的安全检查：在项目 Node 22.23.3 和禁止网络的 `sandbox-exec -p '(version 1) (allow default) (deny network*)'` 下运行时，原 cookie 顺序和并发重放各返回两次 200，检查按设计退出码为 1。此失败不可视为通过或跳过，PR #48 保持草稿。
+- 独立 QA 复核最终诊断及 parser，并用三个隔离内存控件验证测试：签名后按规范 nonce 模拟原子消费时通过；把重复请求改为 500 时仍失败；先消耗再验签导致错误签名烧掉挑战时失败。诊断脚本 SHA256 为 `9d37d29f86af43e40e95f2f97c835fd1bb1387690096826b50c758c0240b7e00`，parser 文件为 `9d8820f2735f0944c0ae9118a7644de4f1662ff4707e674741d0dd220876fde4`。控件只验证测试本身，并非真实数据库修复。
+- 完整修复需在真实签名校验后、创建用户或生成/验证 OTP 前，通过共享后端对稳定 nonce 标识执行原子单次消费；冲突及存储异常均须失败关闭，后续 Auth 失败须重新获取挑战。不得以进程内 Map、浏览器锁或先查后写代替；不得仅对原始 cookie 字符串散列作为身份。应使用已验证的地址与 nonce 等规范字段，不存原始 cookie 或签名，设计受限服务权限及安全过期清理。正式迁移仍须确认目标库、权限和既有 0031–0036 顺序，隔离 PostgreSQL 多连接、权限、错误与后检通过后受控执行。当前未新增或执行该迁移，真实 Supabase 和手机钱包未验收。

@@ -78,7 +78,9 @@ export function verifyChallengeCookieValue(
   address: string
 ): WalletChallenge | null {
   if (!cookieValue) return null;
-  const [encoded, signature] = cookieValue.split(".");
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2) return null;
+  const [encoded, signature] = parts;
   if (!encoded || !signature) return null;
 
   const expectedSignature = sign(encoded);
