@@ -18,6 +18,8 @@ const messages = {
   noAddressShort: "no address",
   walletConnectUnavailable: "not configured",
   walletConnectUnauthorized: "session not authorized",
+  walletSignInInProgress: "sign-in in progress",
+  walletSignInCoordinationUnavailable: "coordination unavailable",
   nonceFailed: "nonce failed",
   verifyFailed: "verification failed",
   metadataDescription: "synthetic metadata",
@@ -61,7 +63,7 @@ function response(payload) {
   return { ok: true, json: async () => payload };
 }
 function fixture(options = {}) {
-  const { selected = address, nonceWait, signWait } = options;
+  const { selected = address, nonceWait, signWait, disconnectWait } = options;
   const session = Object.prototype.hasOwnProperty.call(options, "session") ? options.session : approvedSession();
   const calls = { fetches: [], requests: [], disconnects: 0, init: 0 };
   const provider = {
@@ -69,7 +71,10 @@ function fixture(options = {}) {
     chainId: 1,
     accounts: selected ? [selected] : [],
     async connect() {},
-    async disconnect() { calls.disconnects += 1; },
+    async disconnect() {
+      calls.disconnects += 1;
+      if (disconnectWait) await disconnectWait.promise;
+    },
     async request(args) {
       calls.requests.push(args);
       if (signWait) return signWait.promise;
@@ -92,6 +97,7 @@ function fixture(options = {}) {
   };
   const client = loadModule("src/lib/wallet-client.ts", {
     "@/lib/walletconnect-session": sessionModule,
+    "@/lib/wallet-sign-in-lock": loadModule("src/lib/wallet-sign-in-lock.ts", {}, globals),
     "@walletconnect/ethereum-provider": {
       EthereumProvider: {
         async init() { calls.init += 1; return provider; },
@@ -236,4 +242,37 @@ test("injected wallet login does not require a WalletConnect session", async () 
   assert.equal(result.address, address);
   assert.equal(instance.calls.fetches.length, 2);
   assert.equal(instance.calls.init, 0);
+});
+
+test("an injected sign-in cannot overlap a pending WalletConnect sign-in in the same tab", async () => {
+  const nonceWait = deferred();
+  const instance = fixture({ nonceWait });
+  const first = instance.client.connectWalletConnectAndSignIn(messages);
+  await waitUntil(() => instance.calls.fetches.length === 1);
+  await assert.rejects(instance.client.connectWalletAndSignIn(messages), /sign-in in progress/);
+  assert.equal(instance.calls.fetches.length, 1);
+  nonceWait.resolve(response({ message }));
+  assert.equal((await first).address, address);
+  assert.equal(instance.calls.fetches.length, 2);
+  assert.equal(instance.calls.disconnects, 1);
+});
+
+test("the lock remains held until WalletConnect disconnect cleanup finishes", async () => {
+  const disconnectWait = deferred();
+  const instance = fixture({ disconnectWait });
+  const first = instance.client.connectWalletConnectAndSignIn(messages);
+  await waitUntil(() => instance.calls.disconnects === 1);
+  await assert.rejects(instance.client.connectWalletAndSignIn(messages), /sign-in in progress/);
+  assert.equal(instance.calls.fetches.length, 2);
+  disconnectWait.resolve();
+  assert.equal((await first).address, address);
+});
+
+test("a failed wallet signature releases the lock for a later attempt", async () => {
+  const instance = fixture();
+  instance.provider.request = async () => { throw new Error("synthetic rejection"); };
+  await assert.rejects(instance.client.connectWalletConnectAndSignIn(messages), /synthetic rejection/);
+  instance.provider.request = async () => "synthetic signature";
+  assert.equal((await instance.client.connectWalletConnectAndSignIn(messages)).address, address);
+  assert.equal(instance.calls.disconnects, 2);
 });

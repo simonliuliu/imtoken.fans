@@ -96,6 +96,7 @@ const imports = {
 const nonce = load('src/app/api/auth/wallet/nonce/route.ts', imports).POST;
 const verify = load('src/app/api/auth/wallet/verify/route.ts', imports).POST;
 const sessionGuard = load('src/lib/walletconnect-session.ts');
+const signInLock = load('src/lib/wallet-sign-in-lock.ts');
 function request(url, body) {
   return new Request('https://synthetic.invalid' + url, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -123,6 +124,7 @@ for (const locale of ['zh', 'en']) {
   };
   const client = load('src/lib/wallet-client.ts', {
     '@/lib/walletconnect-session': sessionGuard,
+    '@/lib/wallet-sign-in-lock': signInLock,
     '@walletconnect/ethereum-provider': { EthereumProvider: { init: async () => provider } },
   }, {
     process: { env: { NEXT_PUBLIC_REOWN_PROJECT_ID: 'synthetic-project' } },
@@ -133,7 +135,8 @@ for (const locale of ['zh', 'en']) {
       : verify(request(url, JSON.parse(options.body))),
   });
   const messages = {
-    walletConnectUnauthorized: 'unauthorized', nonceFailed: 'nonce failed', verifyFailed: 'verify failed',
+    walletConnectUnauthorized: 'unauthorized', walletSignInInProgress: 'busy',
+    walletSignInCoordinationUnavailable: 'unavailable', nonceFailed: 'nonce failed', verifyFailed: 'verify failed',
   };
   const before = issued;
   const result = await client.connectWalletConnectAndSignIn(messages);

@@ -1,4 +1,5 @@
 import { walletConnectSessionAllowsSignIn } from "@/lib/walletconnect-session";
+import { withWalletSignInLock } from "@/lib/wallet-sign-in-lock";
 
 // 浏览器端的钱包登录流程：连接钱包（注入式 / WalletConnect 扫码）→ 拿到挑战文案 → 签名 → 服务端校验。
 // 两种连接方式最终都是拿到一个 EIP-1193 风格的 provider（有 .request() 方法），后面的挑战/签名/校验逻辑是共用的。
@@ -14,6 +15,8 @@ export interface WalletMessages {
   noAddressShort: string;
   walletConnectUnavailable: string;
   walletConnectUnauthorized: string;
+  walletSignInInProgress: string;
+  walletSignInCoordinationUnavailable: string;
   nonceFailed: string;
   verifyFailed: string;
   metadataDescription: string;
@@ -84,62 +87,72 @@ async function requestChallengeAndVerify(
 }
 
 export async function connectWalletAndSignIn(messages: WalletMessages): Promise<{ address: string }> {
-  const ethereum = window.ethereum;
-  if (!ethereum) {
-    throw new Error(messages.noInjectedWallet);
-  }
+  return withWalletSignInLock({
+    inProgress: messages.walletSignInInProgress,
+    unavailable: messages.walletSignInCoordinationUnavailable,
+  }, async () => {
+    const ethereum = window.ethereum;
+    if (!ethereum) {
+      throw new Error(messages.noInjectedWallet);
+    }
 
-  const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
-  const address = accounts[0];
-  if (!address) {
-    throw new Error(messages.noAddress);
-  }
+    const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
+    const address = accounts[0];
+    if (!address) {
+      throw new Error(messages.noAddress);
+    }
 
-  return requestChallengeAndVerify(ethereum, address, messages);
+    return requestChallengeAndVerify(ethereum, address, messages);
+  });
 }
 
 export async function connectWalletConnectAndSignIn(
   messages: WalletMessages
 ): Promise<{ address: string }> {
-  const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
-  if (!projectId) {
-    throw new Error(messages.walletConnectUnavailable);
-  }
-
-  // 用动态 import：只有真的点了「扫码连接」才会加载 WalletConnect 的代码，不影响其它页面的体积。
-  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
-  const provider = await EthereumProvider.init({
-    projectId,
-    chains: [1],
-    showQrModal: true,
-    metadata: {
-      name: "imToken Fans",
-      description: messages.metadataDescription,
-      url: window.location.origin,
-      icons: [`${window.location.origin}/icon`],
-    },
-  });
-
-  try {
-    await provider.connect();
-    const address = provider.accounts[0];
-    if (!address) {
-      throw new Error(messages.noAddressShort);
+  return withWalletSignInLock({
+    inProgress: messages.walletSignInInProgress,
+    unavailable: messages.walletSignInCoordinationUnavailable,
+  }, async () => {
+    const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
+    if (!projectId) {
+      throw new Error(messages.walletConnectUnavailable);
     }
-    const sessionIsAuthorized = () =>
-      provider.chainId === 1 &&
-      typeof provider.accounts[0] === "string" &&
-      provider.accounts[0].toLowerCase() === address.toLowerCase() &&
-      walletConnectSessionAllowsSignIn(provider.session, address);
-    if (!sessionIsAuthorized()) {
-      throw new Error(messages.walletConnectUnauthorized);
-    }
-    return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages, sessionIsAuthorized);
-  } finally {
+
+    // 用动态 import：只有真的点了「扫码连接」才会加载 WalletConnect 的代码，不影响其它页面的体积。
+    const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+    const provider = await EthereumProvider.init({
+      projectId,
+      chains: [1],
+      showQrModal: true,
+      metadata: {
+        name: "imToken Fans",
+        description: messages.metadataDescription,
+        url: window.location.origin,
+        icons: [`${window.location.origin}/icon`],
+      },
+    });
+
     try {
-      await provider.disconnect();
-    } catch {
-      // 断开连接失败不影响登录结果，忽略即可
+      await provider.connect();
+      const address = provider.accounts[0];
+      if (!address) {
+        throw new Error(messages.noAddressShort);
+      }
+      const sessionIsAuthorized = () =>
+        provider.chainId === 1 &&
+        typeof provider.accounts[0] === "string" &&
+        provider.accounts[0].toLowerCase() === address.toLowerCase() &&
+        walletConnectSessionAllowsSignIn(provider.session, address);
+      if (!sessionIsAuthorized()) {
+        throw new Error(messages.walletConnectUnauthorized);
+      }
+      return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages, sessionIsAuthorized);
+    } finally {
+      try {
+        await provider.disconnect();
+      } catch {
+        // 断开连接失败不影响登录结果，忽略即可
+      }
     }
-  }
+  });
 }
