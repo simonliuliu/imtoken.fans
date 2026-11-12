@@ -837,6 +837,7 @@
     "noAddress": "没有获取到钱包地址，请在钱包中确认已连接",
     "noAddressShort": "没有获取到钱包地址",
     "walletConnectUnavailable": "扫码连接暂未开放（缺少 Reown Project ID）",
+    "walletConnectUnauthorized": "连接未能确认可用的以太坊账户和登录签名权限，请重试。",
     "nonceFailed": "获取验证码失败",
     "verifyFailed": "钱包验证失败"
   },

@@ -34,3 +34,10 @@
 - 在 `/private/tmp/imtoken-wallet-probe.a70IT3` 用当前候选的完整依赖清单和锁文件做隔离方案实验：用 `@walletconnect/universal-provider@2.26.0` 配本地 `qrcode.react@4.2.0` 替代现有 `@walletconnect/ethereum-provider`；没有将此方案写入项目或上线。实验 `npm ci --ignore-scripts`、模块导入和本地 SVG 生成通过；该实验树的生产 audit 为 0，连同上述开发依赖 override 的另一个锁文件实验中全量 audit 为 0。二者只证明所测试时点的依赖解析与审计结果，不能证明钱包连接或生产安全已验收。
 - 独立 QA 使用真实 Universal Provider 包、虚构 SignClient、临时随机签名账号并封锁网络：二维码生成、模拟配对签名与断开、取消后晚到批准 3 项观察均与测试预期一致；最后一项证实取消函数本身不能阻止晚到批准。进一步负例确认该版 `abortPairingAttempt()` 是 no-op；而请求的 namespace 转为 optional，连接成功也可能没有批准 `personal_sign` 或只批准其他链。未来集成必须基于实际批准 session 校验链、账号和方法，并对取消、超时、旧尝试后的 nonce/签名/验证/跳转设置隔离及晚到会话清理；验证请求发出后取消的会话写入竞态也要单独设计。虚构 SignClient 不代表真实授权校验或真实网络会话；二维码图形仍编码配对机密，本地 SVG 不含明文 URI 也不代表防泄漏。以上是替代方案的 P1 前置条件，不是当前线上漏洞已经被利用的证据。
 - 本轮沿既有 Claude 设计渠道请求一个扫码弹窗设计交接，模型请求 `devin/claude-opus-5-5` / `low`，返回 15,647 输入、3,577 输出 token；渠道接受请求不等于核验其内部路由。方案建议沿用现有入口、本地二维码和明确的取消/重试状态，并指出移除原钱包列表与移动深链可能影响同设备连接。未采纳为生产实现；真实扫码/签名、手机深链、取消并发、会话清理、无障碍及隐私/遥测验收仍待完成。
+
+## 2026-11-12 钱包会话授权增量
+
+- 当前候选仍使用既有 `@walletconnect/ethereum-provider`，没有更换钱包 SDK 或扫码界面。新增会话检查：在请求 nonce 前、nonce 返回后及签名返回后，核对未过期的实际 session 已授权以太坊主网、当前账户及 `personal_sign`，同时要求 provider 当前链与账户一致。缺失、过期、不一致或异常大的授权列表按失败处理；中英文错误提示同步。服务端仍独立校验 nonce 与真实签名，前端校验不替代身份验证。
+- 独立 QA 发现初版仅核对 session 链而未核对 provider 当前链；已增加初始、nonce 等待和签名等待期间的链变化保护，并独立复核。钱包授权隔离回归 23 项通过；初跑的 20 项有 1 项因测试夹具把显式 `undefined` 替换为默认有效 session 而失败，修正夹具后重跑通过，再追加 3 项链变化测试。中英 1,570 键、lint、Webpack 构建/TypeScript 通过，构建保留既有 OG 图片提示。
+- 独立 QA 对链相关 6 项复测通过，另以真实 wallet-client、nonce/verify 路由、HMAC 与 viem 临时密钥验证中英正确签名、错误签名和 nonce 覆盖共 5 项；HTTP、cookie、用户和 OTP 存储均为内存夹具并阻断外网。可复现脚本为 `tests/unit/walletconnect-identity-flow.mjs`；虚构账号和内存存储不代表真实钱包、浏览器 cookie 或 Supabase 验收。
+- verify 请求发出后，前端撤权、关页或取消不能保证撤销服务器已发生的会话写入；本增量未解决取消、晚到响应、并发及旧尝试的完整隔离。真实钱包扫码、签名、手机设备仍待验收。两个钱包 Zod 3 安装位置与 11 个 high 传播节点未改变，audit 仍非零，[PR #48](https://github.com/simonliuliu/imtoken.fans/pull/48) 继续为草稿，尚未发布。

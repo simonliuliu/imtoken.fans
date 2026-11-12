@@ -1,3 +1,5 @@
+import { walletConnectSessionAllowsSignIn } from "@/lib/walletconnect-session";
+
 // 浏览器端的钱包登录流程：连接钱包（注入式 / WalletConnect 扫码）→ 拿到挑战文案 → 签名 → 服务端校验。
 // 两种连接方式最终都是拿到一个 EIP-1193 风格的 provider（有 .request() 方法），后面的挑战/签名/校验逻辑是共用的。
 
@@ -11,6 +13,7 @@ export interface WalletMessages {
   noAddress: string;
   noAddressShort: string;
   walletConnectUnavailable: string;
+  walletConnectUnauthorized: string;
   nonceFailed: string;
   verifyFailed: string;
   metadataDescription: string;
@@ -37,8 +40,16 @@ export function hasWalletConnectProjectId(): boolean {
 async function requestChallengeAndVerify(
   provider: Eip1193Provider,
   address: string,
-  messages: WalletMessages
+  messages: WalletMessages,
+  sessionIsAuthorized?: () => boolean
 ): Promise<{ address: string }> {
+  function requireAuthorization() {
+    if (sessionIsAuthorized && !sessionIsAuthorized()) {
+      throw new Error(messages.walletConnectUnauthorized);
+    }
+  }
+
+  requireAuthorization();
   // /api/* 不走 next-intl 的中间件（见 src/proxy.ts），服务端拿不到 URL 上的语言，
   // 所以显式把 locale 带上；签名挑战文案也要按这个语言生成，校验时才拼得出同一段文字。
   const locale = document.documentElement.lang || "zh";
@@ -52,11 +63,13 @@ async function requestChallengeAndVerify(
     throw new Error(nonceBody.error ?? messages.nonceFailed);
   }
 
+  requireAuthorization();
   const signature = (await provider.request({
     method: "personal_sign",
     params: [nonceBody.message, address],
   })) as string;
 
+  requireAuthorization();
   const verifyRes = await fetch("/api/auth/wallet/verify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -113,7 +126,15 @@ export async function connectWalletConnectAndSignIn(
     if (!address) {
       throw new Error(messages.noAddressShort);
     }
-    return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages);
+    const sessionIsAuthorized = () =>
+      provider.chainId === 1 &&
+      typeof provider.accounts[0] === "string" &&
+      provider.accounts[0].toLowerCase() === address.toLowerCase() &&
+      walletConnectSessionAllowsSignIn(provider.session, address);
+    if (!sessionIsAuthorized()) {
+      throw new Error(messages.walletConnectUnauthorized);
+    }
+    return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages, sessionIsAuthorized);
   } finally {
     try {
       await provider.disconnect();

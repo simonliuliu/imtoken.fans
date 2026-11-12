@@ -837,6 +837,7 @@
     "noAddress": "No wallet address received — confirm the connection in your wallet",
     "noAddressShort": "No wallet address received",
     "walletConnectUnavailable": "Scan to connect isn't available yet (Reown Project ID missing)",
+    "walletConnectUnauthorized": "Could not confirm an Ethereum account and sign-in permission. Please try again.",
     "nonceFailed": "Could not get a challenge code",
     "verifyFailed": "Wallet verification failed"
   },
