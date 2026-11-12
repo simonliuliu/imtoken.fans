@@ -48,3 +48,11 @@
 - 锁与会话授权隔离回归共 33 项、真实客户端与路由的虚构身份密码学流程 5 项通过。独立 QA 发现锁请求 getter 抛错时会暴露浏览器原始错误，已改为仅读取并绑定一次、统一返回不可用提示；QA 对 getter 和异常释放复测 7 项，以及锁覆盖 verify/断开、无锁跨标签边界等负例通过。中英 1,572 键、lint、Webpack 构建/TypeScript 通过；构建保留既有 OG 图片提示。
 - 隔离 WebKit 27.2 以拦截的虚构页面验证两个同源标签互斥、首个释放后重试及不同 origin 不共享锁；未登录真实账号、未连接真实钱包、未访问生产服务。浏览器检查只验证该浏览器实例，不代表真实手机或其他浏览器版本。
 - 两个标签必须都运行新代码且处于同一存储桶及 origin，旧标签、不同 origin 或不同端口不会共享 Web Lock；cookie 可能跨端口共享，不能把跨 origin 情形当成受保护。浏览器不支持 Web Locks 时只有模块实例内互斥。关闭或冻结页面、已发出的 verify、服务器会话写入及旧响应仍有边界，现有增量不保证取消或跨浏览器完全串行。钱包 Zod 3 的 11 个 high 审计传播节点未减少，audit 仍非零，PR #48 继续草稿，尚未发布。
+
+## 2026-11-12 钱包替代方案的本地协议实验
+
+- 在独立依赖目录使用官方 `@walletconnect/universal-provider@2.26.0` 和 `@walletconnect/sign-client@2.26.0`，通过本机模拟 relay 连接真实 SDK 两端；项目当前钱包 SDK、依赖锁文件和扫码界面没有改变。四个场景通过：临时虚构账号配对并完成真实 `personal_sign` 验签；钱包只批准无签名方法或只批准其他链时，当前项目会话 guard 拒绝；调用 `abortPairingAttempt()` 后晚到批准仍能完成，随后显式断开并观察钱包 `session_delete` 和双方 session store 删除。模拟 relay 接收的消息未出现虚构挑战明文或其十六进制形式；这不验证二维码或实际服务的隐私。
+- 项目 Node 22.23.3 在 macOS `sandbox-exec` 下只允许本机回环网络，JavaScript 钩子进一步限定测试 relay 随机端口并拦截 HTTP；独立负例直接连接 `192.0.2.1:443` 得到 `EPERM`。SDK 在实验中 5 次尝试访问 `verify.walletconnect.org`，均被钩子拦截；此结果不代表真实环境没有验证服务或其他联网行为。系统规则允许其他回环端口，也不限制文件访问。
+- 独立 QA 复测实际脚本的四个场景及源码 SHA256 `025480e8efc1caed4e467ec343a3f9b46682fe103e28593bd907ef983456de52`；用错误临时签名者、向模拟 relay 注入虚构挑战明文、清理期间未处理拒绝三个反例分别验证测试会失败。初版在清理前输出成功且只检查前端 session，QA 指出后已改为在清理后检查，确认双方 session 删除，并停止 SDK heartbeat 后自然退出。专项 lint 通过。
+- 复测脚本为 `tests/experiments/walletconnect-universal-offline.mjs`；现有独立包目录是 `/private/tmp/imtoken-wallet-probe.a70IT3`。从项目根目录以 `WALLETCONNECT_TEST_DEPS_ROOT=/private/tmp/imtoken-wallet-probe.a70IT3 sandbox-exec -p '(version 1) (allow default) (deny network*) (allow network-inbound (local ip "localhost:*")) (allow network-outbound (remote ip "localhost:*"))' ./node_modules/node/bin/node tests/experiments/walletconnect-universal-offline.mjs` 运行。临时目录不属于仓库，重建时需隔离安装并核对这两个 SDK 的 2.26.0 版本。
+- 模拟 relay 只实现本实验需要的消息，不验证生产 relay 的鉴权、重试、时序和多节点行为；只确认所测 session 删除，不保证 pairing 记录或全部 SDK 后台状态清理。真实钱包、扫码、手机深链、站点 nonce/verify、取消后的服务端会话竞态、二维码隐私及无障碍均未验收。现有钱包依赖中的两个 Zod 3 与 11 个 high 审计传播节点未改变，审计仍非零；PR #48 继续为草稿，不能合并或发布。
