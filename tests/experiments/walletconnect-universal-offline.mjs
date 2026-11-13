@@ -160,6 +160,10 @@ function handle(ws, message) {
     const guardModule={exports:{}};
     vm.runInNewContext(ts.transpileModule(guardSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:guardModule,exports:guardModule.exports,require});
     const guard=guardModule.exports.walletConnectSessionAllowsSignIn;
+    const coordinatorSource=fs.readFileSync(path.join(projectRoot,'src/lib/walletconnect-attempt-coordinator.ts'),'utf8');
+    const coordinatorModule={exports:{}};
+    vm.runInNewContext(ts.transpileModule(coordinatorSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:coordinatorModule,exports:coordinatorModule.exports,Promise,Error});
+    const makeCoordinator=coordinatorModule.exports.createWalletConnectAttemptCoordinator;
     const scopedSource=fs.readFileSync(path.join(projectRoot,'src/lib/walletconnect-scoped-storage.ts'),'utf8');
     const scopedModule={exports:{}};
     vm.runInNewContext(ts.transpileModule(scopedSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:scopedModule,exports:scopedModule.exports,crypto:crypto.webcrypto,Uint8Array});
@@ -229,6 +233,62 @@ function handle(ws, message) {
     await runScenario({name:'missing-method',methods:[],chain:1});
     await runScenario({name:'wrong-chain',methods:['personal_sign'],chain:137});
     await runScenario({name:'late-after-abort',methods:['personal_sign'],chain:1,abort:true});
+    // Exercise the actual project coordinator with a 2.26 session approved
+    // after retirement. Cancellation alone does not settle connect().
+    phase='coordinator late approval setup';
+    const coordinator=makeCoordinator();
+    let provider,attemptContext,uriReady,cleanupStarted,releaseCleanup;
+    let stalePublications=0,signAfterCancellation=0;
+    const uriPromise=new Promise(resolve=>{uriReady=resolve;});
+    const cleanupStartedPromise=new Promise(resolve=>{cleanupStarted=resolve;});
+    const cleanupGate=new Promise(resolve=>{releaseCleanup=resolve;});
+    const coordinated=coordinator.start({create(){
+      return {
+        async run(context){
+          attemptContext=context;
+          provider=await waitFor(UniversalProvider.init({...common,storage:new MemoryStorage(),customStoragePrefix:'coordinator-late-approval',disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}}),'coordinator provider init');
+          clients.push(provider.client);
+          context.assertActive();
+          provider.on('display_uri',uri=>{context.publish(()=>uriReady(uri));});
+          const session=await provider.connect({namespaces:{eip155:{chains:['eip155:1'],methods:['personal_sign'],events:['accountsChanged','chainChanged'],rpcMap:{'1':'http://127.0.0.1:1'}}}});
+          context.assertActive();
+          signAfterCancellation++;
+          return session;
+        },
+        async close(){
+          cleanupStarted();
+          await cleanupGate;
+          if(provider?.session) await provider.disconnect();
+        },
+      };
+    }});
+    const cancelledResult=assert.rejects(coordinated.result,{name:'WalletConnectAttemptCancelled'});
+    const initialUri=await waitFor(uriPromise,'coordinator URI');
+    assert.equal(coordinated.cancel(),true);
+    assert.equal(attemptContext.publish(()=>{stalePublications++;}),false);
+    assert.throws(()=>coordinator.start({create:()=>({run:async()=>{},close:async()=>{}})}),{name:'WalletConnectAttemptBusy'});
+    phase='coordinator late wallet approval';
+    const delayedProposal=eventOnce(wallet,'session_proposal');
+    await waitFor(wallet.pair({uri:initialUri}),'coordinator wallet pair');
+    const delayed=await waitFor(delayedProposal,'coordinator proposal');
+    const delayedApproval=await waitFor(wallet.approve({id:delayed.id,namespaces:{eip155:{accounts:[`eip155:1:${account.address}`],methods:['personal_sign'],events:['accountsChanged','chainChanged']}}}),'coordinator approval');
+    await waitFor(cleanupStartedPromise,'coordinator cleanup started');
+    const delayedTopic=provider.session.topic;
+    await waitFor(delayedApproval.acknowledged(),'coordinator acknowledgement');
+    await waitForWalletAcknowledgement(delayedTopic);
+    assert(provider.client.session.getAll().some(item=>item.topic===delayedTopic));
+    assert.throws(()=>coordinator.start({create:()=>({run:async()=>{},close:async()=>{}})}),{name:'WalletConnectAttemptBusy'});
+    assert.equal(attemptContext.publish(()=>{stalePublications++;}),false);
+    const coordinatedDeletion=eventOnce(wallet,'session_delete');
+    releaseCleanup();
+    await waitFor(cancelledResult,'coordinator cancelled result');
+    await waitFor(coordinated.released,'coordinator release');
+    assert.equal((await waitFor(coordinatedDeletion,'coordinator wallet deletion')).topic,delayedTopic);
+    assert.equal(provider.client.session.getAll().some(item=>item.topic===delayedTopic),false);
+    assert.equal(wallet.session.getAll().some(item=>item.topic===delayedTopic),false);
+    assert.equal(stalePublications,0);
+    assert.equal(signAfterCancellation,0);
+    assert.equal(await coordinator.start({create:()=>({run:async()=>'new-attempt',close:async()=>{}})}).result,'new-attempt');
     // Use the SDK's default global-core behavior for these two-attempt probes.
     // A distinct prefix alone does not necessarily isolate a shared backend.
     delete process.env.DISABLE_GLOBAL_CORE;
@@ -346,7 +406,7 @@ function handle(ws, message) {
     assert.equal(signatureRequests,9);
     assert.equal(challengeVisibleOnRelay,false);
     assert(pubCount>12);
-    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',isolatedStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','scoped views retain new provider state on a shared backend','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
+    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',isolatedStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','coordinator retains the slot through late approval and controlled cleanup','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','scoped views retain new provider state on a shared backend','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
   } catch(error) {
     const diagnostic=String(error?.message||'').replace(/(?:wc:|https?:\/\/)\S+/gi,'[redacted]').replace(/(?:0x)?[a-f0-9]{24,}/gi,'[redacted]').slice(0,180);
     const walletError=unexpectedRejections.at(-1);
