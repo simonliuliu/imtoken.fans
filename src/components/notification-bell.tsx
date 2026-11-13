@@ -172,8 +172,11 @@ function NotificationPanel({ fullPage, userId, sessionEpoch }: { fullPage: boole
      if(!alive.current)return;
      if(result.error){setError(true);return;}
      if(action==="clear")setOffset(0);
+     if(href&&alive.current){
+      void fetchNotifications();
+      setOpen(fullPage);router.push(href);return;
+     }
      await fetchNotifications();
-     if(href&&alive.current){setOpen(fullPage);router.push(href);}
     }catch{if(alive.current)setError(true);}
    });
   }

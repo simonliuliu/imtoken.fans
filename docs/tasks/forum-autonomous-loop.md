@@ -111,3 +111,7 @@
 
 2026-11-04：用户指定程序优化使用当前聊天选择的 Terra Max，设计按原项目约定使用 Claude，继续保留按风险独立 QA；偏好已写入 AGENTS、工作流与本聊天既有跟进，heartbeat 接口本身不提供模型/强度字段。当前批次的代码、隔离回归和独立 QA 已推进，设计核对调用未产出文件，正式管理会话仍需恢复。具体结果和未验证项见 [论坛反馈任务卡](forum-feedback-inbox.md)，后续继续复用该任务分支与 PR。
 2026-11-06 用户在线上提出登录页过于复杂；[登录页精简](login-page-simplify.md) 优先纳入同一任务队列，独立分支不依赖论坛反馈迁移，已由 [PR #46](https://github.com/simonliuliu/imtoken.fans/pull/46) 发布至精确 main `67da8fe`，Production deployment `7596104855` 成功。论坛反馈 PR #41 的正式预检与迁移仍待完成；管理员审核、回复分页和处分事务按既有依赖顺序继续，不以本批视觉调整冒充其验收。
+
+2026-11-13 依实际代码依赖调整发布次序：回复分页与通知跳转 [PR #43](https://github.com/simonliuliu/imtoken.fans/pull/43) 已在 main `5eb16bd` 发布，Production deployment `7760411000` 成功；独立依赖补丁 [PR #49](https://github.com/simonliuliu/imtoken.fans/pull/49) 已在 main `779cb8e` 发布，Production deployment `7760530521` 成功。这两批不代表论坛反馈、审核或治理迁移已完成。
+
+论坛反馈 PR #41 沿用原分支同步 main `779cb8e`，保留既有队列与迁移候选。受影响的隔离组件/Action 112 项、表单 handler 33 项、虚构认证服务下的 WebKit 登录/导航 9 项、双语检查、lint 和生产构建/类型通过；独立合并 QA 无新增阻塞。安装审计仍有钱包依赖链 11 个 high 传播节点。正式库完整只读预检、0031/0032 迁移及反馈源启用尚未完成，故不合并 PR #41、不读取正式反馈队列；其后治理、消息和媒体继续按实际依赖及任务卡验收。测试细节和未验证范围见 [论坛反馈任务卡](forum-feedback-inbox.md)。
