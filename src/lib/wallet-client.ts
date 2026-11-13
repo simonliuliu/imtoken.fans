@@ -26,6 +26,52 @@ interface Eip1193Provider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 }
 
+/** Optional lifecycle supplied by a future cancellable wallet UI.
+ * isActive must identify this attempt and remain false once it is retired.
+ */
+export interface WalletSignInAttempt {
+  signal?: AbortSignal;
+  isActive?: () => boolean;
+}
+
+/** The caller should handle cancellation without displaying an error string. */
+export class WalletSignInCancelled extends Error {
+  constructor() {
+    super();
+    this.name = "WalletSignInCancelled";
+  }
+}
+
+/** Also call immediately before navigating after a successful sign-in. */
+export function assertWalletSignInActive(attempt?: WalletSignInAttempt): void {
+  try {
+    if (attempt !== undefined && (attempt === null || typeof attempt !== "object")) {
+      throw new WalletSignInCancelled();
+    }
+    const signal = attempt?.signal;
+    const isActive = attempt?.isActive;
+    if (signal !== undefined && signal?.aborted !== false) {
+      throw new WalletSignInCancelled();
+    }
+    if (isActive !== undefined) {
+      if (typeof isActive !== "function") throw new WalletSignInCancelled();
+      const active: unknown = isActive.call(attempt);
+      if (active !== true) {
+        // Reject asynchronous predicates, but consume any rejection they created.
+        void Promise.resolve(active).catch(() => {});
+        throw new WalletSignInCancelled();
+      }
+    }
+    // A synchronous callback can itself abort or replace the attempt's signal.
+    if (attempt?.signal !== signal || (signal !== undefined && signal?.aborted !== false)) {
+      throw new WalletSignInCancelled();
+    }
+  } catch {
+    // Invalid or throwing lifecycle state must not allow authentication.
+    throw new WalletSignInCancelled();
+  }
+}
+
 declare global {
   interface Window {
     ethereum?: Eip1193Provider;
@@ -44,9 +90,11 @@ async function requestChallengeAndVerify(
   provider: Eip1193Provider,
   address: string,
   messages: WalletMessages,
-  sessionIsAuthorized?: () => boolean
+  sessionIsAuthorized?: () => boolean,
+  attempt?: WalletSignInAttempt
 ): Promise<{ address: string }> {
   function requireAuthorization() {
+    assertWalletSignInActive(attempt);
     if (sessionIsAuthorized && !sessionIsAuthorized()) {
       throw new Error(messages.walletConnectUnauthorized);
     }
@@ -61,7 +109,9 @@ async function requestChallengeAndVerify(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address, locale }),
   });
+  assertWalletSignInActive(attempt);
   const nonceBody = await nonceRes.json();
+  assertWalletSignInActive(attempt);
   if (!nonceRes.ok) {
     throw new Error(nonceBody.error ?? messages.nonceFailed);
   }
@@ -78,7 +128,9 @@ async function requestChallengeAndVerify(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address, signature, locale }),
   });
+  assertWalletSignInActive(attempt);
   const verifyBody = await verifyRes.json();
+  assertWalletSignInActive(attempt);
   if (!verifyRes.ok) {
     throw new Error(verifyBody.error ?? messages.verifyFailed);
   }
@@ -86,73 +138,99 @@ async function requestChallengeAndVerify(
   return { address };
 }
 
-export async function connectWalletAndSignIn(messages: WalletMessages): Promise<{ address: string }> {
-  return withWalletSignInLock({
-    inProgress: messages.walletSignInInProgress,
-    unavailable: messages.walletSignInCoordinationUnavailable,
-  }, async () => {
-    const ethereum = window.ethereum;
-    if (!ethereum) {
-      throw new Error(messages.noInjectedWallet);
-    }
+export async function connectWalletAndSignIn(
+  messages: WalletMessages,
+  attempt?: WalletSignInAttempt
+): Promise<{ address: string }> {
+  try {
+    assertWalletSignInActive(attempt);
+    const result = await withWalletSignInLock({
+      inProgress: messages.walletSignInInProgress,
+      unavailable: messages.walletSignInCoordinationUnavailable,
+    }, async () => {
+      assertWalletSignInActive(attempt);
+      const ethereum = window.ethereum;
+      if (!ethereum) {
+        throw new Error(messages.noInjectedWallet);
+      }
 
-    const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
-    const address = accounts[0];
-    if (!address) {
-      throw new Error(messages.noAddress);
-    }
+      const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
+      assertWalletSignInActive(attempt);
+      const address = accounts[0];
+      if (!address) {
+        throw new Error(messages.noAddress);
+      }
 
-    return requestChallengeAndVerify(ethereum, address, messages);
-  });
+      return requestChallengeAndVerify(ethereum, address, messages, undefined, attempt);
+    });
+    assertWalletSignInActive(attempt);
+    return result;
+  } catch (error) {
+    assertWalletSignInActive(attempt);
+    throw error;
+  }
 }
 
 export async function connectWalletConnectAndSignIn(
-  messages: WalletMessages
+  messages: WalletMessages,
+  attempt?: WalletSignInAttempt
 ): Promise<{ address: string }> {
-  return withWalletSignInLock({
-    inProgress: messages.walletSignInInProgress,
-    unavailable: messages.walletSignInCoordinationUnavailable,
-  }, async () => {
-    const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
-    if (!projectId) {
-      throw new Error(messages.walletConnectUnavailable);
-    }
-
-    // 用动态 import：只有真的点了「扫码连接」才会加载 WalletConnect 的代码，不影响其它页面的体积。
-    const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
-    const provider = await EthereumProvider.init({
-      projectId,
-      chains: [1],
-      showQrModal: true,
-      metadata: {
-        name: "imToken Fans",
-        description: messages.metadataDescription,
-        url: window.location.origin,
-        icons: [`${window.location.origin}/icon`],
-      },
-    });
-
-    try {
-      await provider.connect();
-      const address = provider.accounts[0];
-      if (!address) {
-        throw new Error(messages.noAddressShort);
+  try {
+    assertWalletSignInActive(attempt);
+    const result = await withWalletSignInLock({
+      inProgress: messages.walletSignInInProgress,
+      unavailable: messages.walletSignInCoordinationUnavailable,
+    }, async () => {
+      assertWalletSignInActive(attempt);
+      const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
+      if (!projectId) {
+        throw new Error(messages.walletConnectUnavailable);
       }
-      const sessionIsAuthorized = () =>
-        provider.chainId === 1 &&
-        typeof provider.accounts[0] === "string" &&
-        provider.accounts[0].toLowerCase() === address.toLowerCase() &&
-        walletConnectSessionAllowsSignIn(provider.session, address);
-      if (!sessionIsAuthorized()) {
-        throw new Error(messages.walletConnectUnauthorized);
-      }
-      return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages, sessionIsAuthorized);
-    } finally {
+
+      // 用动态 import：只有真的点了「扫码连接」才会加载 WalletConnect 的代码，不影响其它页面的体积。
+      const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+      assertWalletSignInActive(attempt);
+      const provider = await EthereumProvider.init({
+        projectId,
+        chains: [1],
+        showQrModal: true,
+        metadata: {
+          name: "imToken Fans",
+          description: messages.metadataDescription,
+          url: window.location.origin,
+          icons: [`${window.location.origin}/icon`],
+        },
+      });
+
       try {
-        await provider.disconnect();
-      } catch {
-        // 断开连接失败不影响登录结果，忽略即可
+        assertWalletSignInActive(attempt);
+        await provider.connect();
+        assertWalletSignInActive(attempt);
+        const address = provider.accounts[0];
+        if (!address) {
+          throw new Error(messages.noAddressShort);
+        }
+        const sessionIsAuthorized = () =>
+          provider.chainId === 1 &&
+          typeof provider.accounts[0] === "string" &&
+          provider.accounts[0].toLowerCase() === address.toLowerCase() &&
+          walletConnectSessionAllowsSignIn(provider.session, address);
+        if (!sessionIsAuthorized()) {
+          throw new Error(messages.walletConnectUnauthorized);
+        }
+        return await requestChallengeAndVerify(provider as unknown as Eip1193Provider, address, messages, sessionIsAuthorized, attempt);
+      } finally {
+        try {
+          await provider.disconnect();
+        } catch {
+          // 断开连接失败不影响登录结果，忽略即可
+        }
       }
-    }
-  });
+    });
+    assertWalletSignInActive(attempt);
+    return result;
+  } catch (error) {
+    assertWalletSignInActive(attempt);
+    throw error;
+  }
 }
