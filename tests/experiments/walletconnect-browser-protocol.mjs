@@ -161,9 +161,13 @@ async function bundleFixture() {
   assert.equal(version("@walletconnect/universal-provider"), "2.26.0");
   assert.equal(version("@walletconnect/sign-client"), "2.26.0");
   assert.equal(version("@walletconnect/core"), "2.26.0");
+  const projectSafeJson = path.join(root, "node_modules/@walletconnect/safe-json/dist/esm/index.js");
+  const fixtureSafeJson = path.join(fixtureRoot, "node_modules/@walletconnect/safe-json/dist/esm/index.js");
+  assert.equal(readFileSync(projectSafeJson).equals(readFileSync(fixtureSafeJson)), true);
   for (const [source, target] of [
     ["src/lib/walletconnect-scoped-storage.ts", "scoped.mjs"],
     ["src/lib/walletconnect-indexeddb-storage.ts", "indexeddb.mjs"],
+    ["src/lib/walletconnect-storage-codec.ts", "codec.mjs"],
     ["src/lib/walletconnect-session.ts", "session.mjs"],
   ]) {
     const input = await readFile(path.join(root, source), "utf8");
@@ -174,10 +178,12 @@ async function bundleFixture() {
 import { UniversalProvider } from ${JSON.stringify(providerEntry)};
 import { createWalletConnectStorageScope, scopeWalletConnectStorage } from "./scoped.mjs";
 import { createWalletConnectAttemptStorage } from "./indexeddb.mjs";
+import { walletConnectValueStorage } from "./codec.mjs";
 import { walletConnectSessionAllowsSignIn } from "./session.mjs";
 window.makeScope = createWalletConnectStorageScope;
 window.openProvider = async (scope, port) => {
-  window.storage = scopeWalletConnectStorage(createWalletConnectAttemptStorage(), scope);
+  window.scopeStorage = scopeWalletConnectStorage(createWalletConnectAttemptStorage(), scope);
+  window.storage = walletConnectValueStorage(window.scopeStorage);
   window.provider = await UniversalProvider.init({
     projectId: "00000000000000000000000000000000", relayUrl: "ws://127.0.0.1:" + port,
     storage: window.storage, customStoragePrefix: "browser-" + scope,
@@ -219,18 +225,24 @@ window.rawScopeCount = (scope) => new Promise((resolve, reject) => {
   await new Promise((resolve, reject) => webpack(config, (error, stats) => {
     if (error) return reject(error);
     if (stats.hasErrors()) return reject(new Error(stats.toString({ all: false, errors: true })));
-    const modules = stats.toJson({ all: false, modules: true }).modules || [];
+    const modules = stats.toJson({ all: false, modules: true, reasons: true }).modules || [];
     const identifiers = modules.map((module) => module.identifier || "");
     for (const name of ["universal-provider", "sign-client", "core"]) {
       const expected = path.join(fixtureRoot, "node_modules", "@walletconnect", name, "dist", "index.js");
       if (!identifiers.some((identifier) => identifier.includes(expected))) return reject(new Error(`Missing isolated ${name} SDK module`));
     }
     const walletModules = identifiers.filter((identifier) => identifier.includes(`${path.sep}node_modules${path.sep}@walletconnect${path.sep}`));
-    if (walletModules.some((identifier) => !identifier.includes(`${fixtureRoot}${path.sep}`))) return reject(new Error("Mixed WalletConnect SDK fixture modules"));
+    const projectWalletModules = modules.filter((module) => {
+      const identifier = module.identifier || "";
+      return identifier.includes(`${path.sep}node_modules${path.sep}@walletconnect${path.sep}`) && !identifier.includes(`${fixtureRoot}${path.sep}`);
+    });
+    if (projectWalletModules.length !== 1 || !projectWalletModules[0].identifier?.includes(projectSafeJson)) return reject(new Error("Mixed WalletConnect SDK fixture modules"));
+    const safeJsonReasons = projectWalletModules[0].reasons || [];
+    if (!safeJsonReasons.length || safeJsonReasons.some((reason) => !reason.moduleIdentifier?.includes(path.join(temp, "codec.mjs")))) return reject(new Error("SDK imported the project safe-json module"));
     const expectedNames = new Set(["@walletconnect/universal-provider", "@walletconnect/sign-client", "@walletconnect/core", "@walletconnect/utils", "@walletconnect/types"]);
     const found = new Set();
     const checked = new Set();
-    for (const identifier of walletModules) {
+    for (const identifier of walletModules.filter((value) => value.includes(`${fixtureRoot}${path.sep}`))) {
       const start = identifier.indexOf(`${fixtureRoot}${path.sep}`);
       let directory = path.dirname(identifier.slice(start).split("|")[0].split("?")[0]);
       while (directory.startsWith(`${fixtureRoot}${path.sep}`)) {
@@ -402,7 +414,7 @@ try {
   await otherPage.evaluate(async () => {
     window.provider.client.core.heartbeat.stop();
     await window.provider.client.core.relayer.transportClose();
-    await window.storage.close();
+    await window.scopeStorage.close();
   });
   await recordBrowserNetwork(otherPage);
   await otherPage.close();
@@ -433,7 +445,7 @@ try {
   await waitFor(restoredPage.evaluate(() => window.provider.disconnect()), "browser disconnect");
   assert.equal((await waitFor(removed, "wallet session deletion")).topic, topic);
   assert.equal(wallet.session.getAll().some((session) => session.topic === topic), false);
-  await restoredPage.evaluate(() => window.storage.close());
+  await restoredPage.evaluate(() => window.scopeStorage.close());
   assert.equal(await restoredPage.evaluate((scopeId) => window.rawScopeCount(scopeId), scope), 0);
   await recordBrowserNetwork(restoredPage);
   assert.equal(browserBlockedSockets, 0);

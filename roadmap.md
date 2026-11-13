@@ -305,3 +305,5 @@ PR #31已将普通帖/产品/反馈发布修复整合至main。本地3000已获�
 2026-11-13 钱包存储迁移风险：真实 SDK 的旧 localStorage 迁移在人为强制的同源双标签交错下可覆盖虚构旧 session，独立 QA 复现；未核验线上发生。新增未接入登录的独立 IndexedDB 后端候选，不迁移或删除旧数据；临时 WebKit profile 14 组、专项 lint/TypeScript 与独立 QA 通过。默认 SDK 的安全基线断言仍失败，真实 SDK 接入与序列化差异、旧会话恢复、同 scope 复活、孤儿清理和真实钱包仍待处理；PR #48 保持草稿，详见 [安全任务卡](docs/tasks/framework-security-2026-11-11.md)。
 
 2026-11-13 钱包浏览器协议隔离实验：真实 WalletConnect 2.26.0 与虚构本机 relay、临时签名账号及独立 WebKit profile 完成签名、不同 scope 清理、浏览器重启后从独立 IndexedDB 恢复 session 并再次签名；旧 localStorage 虚构记录保留。SDK、登录界面及依赖锁文件未替换，默认 Core、真实钱包、存储值兼容、原 SDK 迁移失败检查及线上依赖/数据库验收仍待处理；PR #48 继续草稿，详见 [安全任务卡](docs/tasks/framework-security-2026-11-11.md)。
+
+2026-11-13 钱包存储值编码候选：未接入登录的适配层按现有 SDK 浏览器 IndexedDB 值语义处理数据，并保留不同逻辑键与原始格式的独立命名空间；31 种虚构输入、29 条枚举、退役和并发删除对照，真实 SDK 隔离协议、独立 QA、lint/构建和类型检查通过。完整及生产 audit 仍有 11 个 high 节点且退出非零，默认 SDK 迁移基线仍失败；真实钱包、旧会话、scope 回收与数据库迁移仍待验收，PR #48 保持草稿。详见 [安全任务卡](docs/tasks/framework-security-2026-11-11.md)。
