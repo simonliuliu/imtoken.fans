@@ -25,6 +25,7 @@ async function bundleFixture() {
     ["src/lib/walletconnect-scoped-storage.ts", "scoped.mjs"],
     ["src/lib/walletconnect-indexeddb-storage.ts", "indexeddb.mjs"],
     ["src/lib/walletconnect-storage-codec.ts", "codec.mjs"],
+    ["src/lib/walletconnect-ephemeral-storage.ts", "ephemeral.mjs"],
   ]) {
     const input = await readFile(path.join(root, source), "utf8");
     await writeFile(path.join(temp, target), ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText);
@@ -34,12 +35,17 @@ import { KeyValueStorage } from ${JSON.stringify(browserBackend)};
 import { scopeWalletConnectStorage } from "./scoped.mjs";
 import { createWalletConnectAttemptStorage } from "./indexeddb.mjs";
 import { walletConnectValueStorage } from "./codec.mjs";
+import { createWalletConnectEphemeralStorage } from "./ephemeral.mjs";
 window.makeLegacy = () => new KeyValueStorage();
 window.makeCandidate = (scopeId) => {
   const scoped = scopeWalletConnectStorage(createWalletConnectAttemptStorage(), scopeId);
   return { scoped, storage: walletConnectValueStorage(scoped) };
 };
 window.wrapScoped = walletConnectValueStorage;
+window.makeMemory = () => {
+  const scoped = createWalletConnectEphemeralStorage();
+  return { scoped, storage: walletConnectValueStorage(scoped) };
+};
 `);
   const config = {
     mode: "production", target: "web", context: root, entry: path.join(temp, "fixture.mjs"),
@@ -75,6 +81,7 @@ try {
   const result = await page.evaluate(async () => {
     const legacy = window.makeLegacy();
     const { scoped, storage: candidate } = window.makeCandidate("a".repeat(32));
+    const { scoped: memoryScoped, storage: memory } = window.makeMemory();
     await scoped.setItem("numeric-string", { format: "synthetic-raw-v0" });
     function shape(value, seen = new WeakSet()) {
       if (value === undefined) return { type: "undefined" };
@@ -111,16 +118,26 @@ try {
     const comparisons = [];
     for (const [key, create] of cases) {
       const row = { key };
-      for (const [label, backend] of [["legacy", legacy], ["candidate", candidate]]) {
+      for (const [label, backend] of [["legacy", legacy], ["candidate", candidate], ["memory", memory]]) {
         try { await backend.setItem(key, create()); row[label] = { ok: true, value: shape(await backend.getItem(key)) }; }
         catch (error) { row[label] = { ok: false, errorName: error.name }; }
       }
-      row.same = JSON.stringify(row.legacy) === JSON.stringify(row.candidate);
+      row.same = JSON.stringify(row.legacy) === JSON.stringify(row.candidate) && JSON.stringify(row.legacy) === JSON.stringify(row.memory);
       comparisons.push(row);
     }
     const entriesShape = async (backend) => (await backend.getEntries()).map(([key, value]) => [key, shape(value)]).sort((a, b) => a[0].localeCompare(b[0]));
     const legacyEntries = await entriesShape(legacy);
     const candidateEntries = await entriesShape(candidate);
+    const memoryEntries = await entriesShape(memory);
+    const objectCopies = [];
+    for (const backend of [legacy, candidate, memory]) {
+      const original = { nested: { count: 1 } };
+      await backend.setItem("object-copy", original);
+      original.nested.count = 2;
+      const firstRead = await backend.getItem("object-copy");
+      firstRead.nested.count = 3;
+      objectCopies.push((await backend.getItem("object-copy")).nested.count);
+    }
     const rawPreserved = await scoped.getItem("numeric-string");
     await candidate.setItem("a/b", "slash");
     await candidate.setItem("a:b", "colon");
@@ -184,11 +201,14 @@ try {
     catch (error) { backendError = error.message; }
     await new Promise((resolve) => setTimeout(resolve, 30));
     await scoped.close();
-    return { comparisons, legacyEntries, candidateEntries, rawPreserved, rawAfterCodecRemove, distinctKeys, defaultDeletedEntry: shape(defaultDeletedEntry), candidateDeletedEntry: shape(candidateDeletedEntry), retiredEntries, activeError, backendError, writes, unhandled };
+    await memoryScoped.close();
+    return { comparisons, legacyEntries, candidateEntries, memoryEntries, objectCopies, rawPreserved, rawAfterCodecRemove, distinctKeys, defaultDeletedEntry: shape(defaultDeletedEntry), candidateDeletedEntry: shape(candidateDeletedEntry), retiredEntries, activeError, backendError, writes, unhandled };
   });
   const different = result.comparisons.filter((item) => !item.same);
   assert.deepEqual(different, [], `Value behavior differs for: ${different.map((item) => item.key).join(", ")}`);
   assert.deepEqual(result.candidateEntries, result.legacyEntries);
+  assert.deepEqual(result.memoryEntries, result.legacyEntries);
+  assert.deepEqual(result.objectCopies, [1, 1, 1]);
   assert.deepEqual(result.rawPreserved, { format: "synthetic-raw-v0" });
   assert.deepEqual(result.rawAfterCodecRemove, { format: "synthetic-raw-v0" });
   assert.deepEqual(result.distinctKeys, ["slash", "colon", "backslash"]);
@@ -201,7 +221,7 @@ try {
   assert.deepEqual(pageErrors, []);
   await context.close();
   context = undefined;
-  process.stdout.write(JSON.stringify({ status: "passed", backend: "@walletconnect/keyvaluestorage@1.1.1", browser: "isolated WebKit", valueCases: result.comparisons.length, entries: result.legacyEntries.length, checks: ["set/get value comparison", "getEntries value comparison", "concurrent deletion", "raw-format isolation", "distinct logical keys", "retired enumeration", "retired cyclic value", "reentrant retirement"] }) + "\n");
+  process.stdout.write(JSON.stringify({ status: "passed", backend: "@walletconnect/keyvaluestorage@1.1.1", browser: "isolated WebKit", valueCases: result.comparisons.length, entries: result.legacyEntries.length, checks: ["persistent and memory codec set/get comparison", "getEntries value comparison", "object mutation isolation", "concurrent deletion", "raw-format isolation", "distinct logical keys", "retired enumeration", "retired cyclic value", "reentrant retirement"] }) + "\n");
 } finally {
   if (context) await context.close();
   await rm(temp, { recursive: true, force: true });

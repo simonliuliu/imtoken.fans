@@ -28,6 +28,8 @@ const temp = await mkdtemp(path.join(os.tmpdir(), "imtoken-wc-browser-protocol-"
 const profile = path.join(temp, "profile");
 const origin = "http://localhost:3000";
 const syntheticMessage = "synthetic-offline-browser-wallet-signature";
+const ephemeralDeepLinkMode = process.env.IMTOKEN_EPHEMERAL_DEEPLINK_MODE || "default";
+if (!["wallet-disabled", "local-disabled", "default"].includes(ephemeralDeepLinkMode)) throw new Error("Invalid synthetic deep-link mode");
 let allowedPort = 0;
 let phase = "startup";
 let nodeBlockedRequests = 0;
@@ -168,19 +170,37 @@ async function bundleFixture() {
     ["src/lib/walletconnect-scoped-storage.ts", "scoped.mjs"],
     ["src/lib/walletconnect-indexeddb-storage.ts", "indexeddb.mjs"],
     ["src/lib/walletconnect-storage-codec.ts", "codec.mjs"],
+    ["src/lib/walletconnect-ephemeral-storage.ts", "ephemeral.mjs"],
     ["src/lib/walletconnect-session.ts", "session.mjs"],
   ]) {
     const input = await readFile(path.join(root, source), "utf8");
     await writeFile(path.join(temp, target), ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText);
   }
   const providerEntry = path.join(fixtureRoot, "node_modules/@walletconnect/universal-provider/dist/index.js");
+  const coreEntry = path.join(fixtureRoot, "node_modules/@walletconnect/core/dist/index.js");
   await writeFile(path.join(temp, "fixture.mjs"), `
 import { UniversalProvider } from ${JSON.stringify(providerEntry)};
+import { Core } from ${JSON.stringify(coreEntry)};
 import { createWalletConnectStorageScope, scopeWalletConnectStorage } from "./scoped.mjs";
 import { createWalletConnectAttemptStorage } from "./indexeddb.mjs";
 import { walletConnectValueStorage } from "./codec.mjs";
+import { createWalletConnectEphemeralStorage } from "./ephemeral.mjs";
 import { walletConnectSessionAllowsSignIn } from "./session.mjs";
 window.makeScope = createWalletConnectStorageScope;
+window.openEphemeralProvider = async (scope, port) => {
+  window.ephemeralStorage = createWalletConnectEphemeralStorage();
+  window.ephemeralCodec = walletConnectValueStorage(window.ephemeralStorage);
+  window.ephemeralCore = new Core({
+    projectId: "00000000000000000000000000000000", relayUrl: "ws://127.0.0.1:" + port,
+    storage: window.ephemeralCodec, customStoragePrefix: "ephemeral-" + scope,
+    telemetryEnabled: false, logger: "silent",
+  });
+  window.provider = await UniversalProvider.init({
+    core: window.ephemeralCore, projectId: "00000000000000000000000000000000",
+    relayUrl: "ws://127.0.0.1:" + port, disableProviderPing: true, telemetryEnabled: false,
+    logger: "silent", metadata: { name: "Synthetic app", description: "Offline fixture", url: "https://fixture.invalid", icons: [] },
+  });
+};
 window.openProvider = async (scope, port) => {
   window.scopeStorage = scopeWalletConnectStorage(createWalletConnectAttemptStorage(), scope);
   window.storage = walletConnectValueStorage(window.scopeStorage);
@@ -373,10 +393,103 @@ try {
   });
   phase = "first browser init";
   context = await openContext(bundle);
+  const oldKey = "wc@2:client:0.3//session";
+  phase = "ephemeral browser session";
+  const ephemeralPage = await pageAt(context);
+  const ephemeralScope = await ephemeralPage.evaluate(() => window.makeScope());
+  await ephemeralPage.evaluate((key) => {
+    localStorage.setItem(key, JSON.stringify([{ topic: "synthetic-old-session" }]));
+    localStorage.setItem("WALLETCONNECT_DEEPLINK_CHOICE", JSON.stringify({ href: "https://stale-wallet.invalid" }));
+    window.syntheticOpens = [];
+    window.open = (url) => { window.syntheticOpens.push(new URL(url).origin); return null; };
+    document.hasFocus = () => true;
+    window.persistentAccess = { idbOpen: 0, localReads: 0, localWrites: 0, readKeys: [] };
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (...args) { window.persistentAccess.idbOpen++; return open.apply(this, args); };
+    for (const method of ["setItem", "removeItem", "clear"]) {
+      const original = Storage.prototype[method];
+      Storage.prototype[method] = function (...args) { window.persistentAccess.localWrites++; return original.apply(this, args); };
+    }
+    for (const method of ["getItem", "key"]) {
+      const original = Storage.prototype[method];
+      Storage.prototype[method] = function (...args) { window.persistentAccess.localReads++; window.persistentAccess.readKeys.push(String(args[0])); return original.apply(this, args); };
+    }
+  }, oldKey);
+  await waitFor(ephemeralPage.evaluate(({ scopeId, port }) => window.openEphemeralProvider(scopeId, port), { scopeId: ephemeralScope, port: allowedPort }), "ephemeral provider init");
+  assert.equal(await ephemeralPage.evaluate(() => window.provider.client.core === window.ephemeralCore && window.ephemeralCore.storage === window.ephemeralCodec), true);
+  const ephemeralProposalPending = eventOnce(wallet, "session_proposal");
+  await ephemeralPage.evaluate(() => window.startConnect());
+  await ephemeralPage.waitForFunction(() => typeof window.fixtureUri === "string", undefined, { timeout: 12000 });
+  await waitFor(wallet.pair({ uri: await ephemeralPage.evaluate(() => window.fixtureUri) }), "ephemeral wallet pair");
+  const ephemeralProposal = await waitFor(ephemeralProposalPending, "ephemeral wallet proposal");
+  const ephemeralApproval = await waitFor(wallet.approve({ id: ephemeralProposal.id, namespaces: { eip155: {
+    accounts: [`eip155:1:${account.address}`], methods: ["personal_sign"], events: ["accountsChanged", "chainChanged"],
+  } }, ...(ephemeralDeepLinkMode === "wallet-disabled" ? { sessionConfig: { disableDeepLink: true } } : {}) }), "ephemeral wallet approval");
+  const ephemeralTopic = await waitFor(ephemeralPage.evaluate(async () => (await window.sessionPromise).topic), "ephemeral browser session");
+  if (ephemeralDeepLinkMode === "local-disabled") {
+    const unchanged = await ephemeralPage.evaluate(async (topic) => {
+      const sessions = window.provider.client.session;
+      const { sessionConfig: originalConfig, ...originalFields } = sessions.get(topic);
+      await sessions.update(topic, { sessionConfig: { ...originalConfig, disableDeepLink: true } });
+      const { sessionConfig: nextConfig, ...nextFields } = sessions.get(topic);
+      return nextConfig.disableDeepLink === true && JSON.stringify(originalFields) === JSON.stringify(nextFields);
+    }, ephemeralTopic);
+    assert.equal(unchanged, true);
+  }
+  if (ephemeralDeepLinkMode !== "default") {
+    assert.equal(await ephemeralPage.evaluate((topic) => window.provider.client.session.get(topic).sessionConfig?.disableDeepLink, ephemeralTopic), true);
+  }
+  await waitFor(ephemeralApproval.acknowledged(), "ephemeral wallet acknowledgement");
+  const ephemeralDeadline = Date.now() + 12000;
+  while (!wallet.session.get(ephemeralTopic)?.acknowledged && Date.now() < ephemeralDeadline) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(wallet.session.get(ephemeralTopic)?.acknowledged, true);
+  if (ephemeralDeepLinkMode === "local-disabled") {
+    await ephemeralPage.evaluate(() => {
+      window.ephemeralUpdate = new Promise((resolve) => window.provider.once("session_update", (event) => resolve(event.topic)));
+    });
+    const update = await waitFor(wallet.update({ topic: ephemeralTopic, namespaces: { eip155: {
+      accounts: [`eip155:1:${account.address}`], methods: ["personal_sign"], events: ["accountsChanged", "chainChanged"],
+    } } }), "ephemeral wallet update");
+    await waitFor(update.acknowledged(), "ephemeral wallet update acknowledgement");
+    assert.equal(await waitFor(ephemeralPage.evaluate(() => window.ephemeralUpdate), "ephemeral session update"), ephemeralTopic);
+    assert.equal(await ephemeralPage.evaluate((topic) => window.provider.client.session.get(topic).sessionConfig?.disableDeepLink, ephemeralTopic), true);
+  }
+  assert.equal(await ephemeralPage.evaluate((address) => window.sessionAllowed(address), account.address), true);
+  assert((await ephemeralPage.evaluate(async () => (await window.ephemeralStorage.getKeys()).length)) > 0);
+  const ephemeralSignature = await waitFor(ephemeralPage.evaluate(({ message, address }) => window.signSynthetic(message, address), { message: stringToHex(syntheticMessage), address: account.address }), "ephemeral signature");
+  assert.equal(await verifyMessage({ address: account.address, message: syntheticMessage, signature: ephemeralSignature }), true);
+  const ephemeralRemoved = eventOnce(wallet, "session_delete");
+  await waitFor(ephemeralPage.evaluate(() => window.provider.disconnect()), "ephemeral disconnect");
+  assert.equal((await waitFor(ephemeralRemoved, "ephemeral wallet deletion")).topic, ephemeralTopic);
+  await ephemeralPage.evaluate(async () => {
+    window.ephemeralCore.heartbeat.stop();
+    await window.ephemeralCore.relayer.transportClose();
+    await window.ephemeralStorage.close();
+    await window.ephemeralCodec.setItem("late", "synthetic");
+  });
+  assert.equal(await ephemeralPage.evaluate(async () => window.ephemeralStorage.closed && (await window.ephemeralStorage.getKeys()).length === 0), true);
+  const nextEphemeralScope = await ephemeralPage.evaluate(() => window.makeScope());
+  assert.notEqual(ephemeralScope, nextEphemeralScope);
+  await waitFor(ephemeralPage.evaluate(({ scopeId, port }) => window.openEphemeralProvider(scopeId, port), { scopeId: nextEphemeralScope, port: allowedPort }), "fresh ephemeral provider init");
+  assert.equal(await ephemeralPage.evaluate(() => window.provider.session === undefined), true);
+  await ephemeralPage.evaluate(async () => {
+    window.ephemeralCore.heartbeat.stop();
+    await window.ephemeralCore.relayer.transportClose();
+    await window.ephemeralStorage.close();
+  });
+  const ephemeralPersistentAccess = await ephemeralPage.evaluate(() => window.persistentAccess);
+  const ephemeralOpened = await ephemeralPage.evaluate(() => window.syntheticOpens);
+  if (ephemeralDeepLinkMode === "default" || process.env.IMTOKEN_BROWSER_PROTOCOL_DEBUG === "1") process.stderr.write(JSON.stringify({ phase: "ephemeral persistent access counters", ...ephemeralPersistentAccess, openedOrigins: ephemeralOpened }) + "\n");
+  assert.deepEqual(ephemeralPersistentAccess, { idbOpen: 0, localReads: 0, localWrites: 0, readKeys: [] });
+  assert.deepEqual(ephemeralOpened, []);
+  assert.equal(await ephemeralPage.evaluate((key) => localStorage.getItem(key), oldKey), '[{"topic":"synthetic-old-session"}]');
+  await recordBrowserNetwork(ephemeralPage);
+  await ephemeralPage.close();
+  phase = "first browser init";
   const firstPage = await pageAt(context);
+  await firstPage.evaluate(() => localStorage.removeItem("WALLETCONNECT_DEEPLINK_CHOICE"));
   const scope = await firstPage.evaluate(() => window.makeScope());
   assert.match(scope, /^[0-9a-f]{32}$/);
-  const oldKey = "wc@2:client:0.3//session";
   await firstPage.evaluate((key) => localStorage.setItem(key, JSON.stringify([{ topic: "synthetic-old-session" }])), oldKey);
   await waitFor(firstPage.evaluate(({ scopeId, port }) => window.openProvider(scopeId, port), { scopeId: scope, port: allowedPort }), "browser provider init");
   phase = "synthetic pairing";
@@ -438,7 +551,7 @@ try {
   phase = "restored signature";
   const restoredSignature = await waitFor(restoredPage.evaluate(({ message, address }) => window.signSynthetic(message, address), { message: stringToHex(syntheticMessage), address: account.address }), "restored signature");
   assert.equal(await verifyMessage({ address: account.address, message: syntheticMessage, signature: restoredSignature }), true);
-  assert.equal(signatureRequests, 3);
+  assert.equal(signatureRequests, 4);
   assert.equal(challengeVisibleOnRelay, false);
   phase = "disconnect";
   const removed = eventOnce(wallet, "session_delete");
@@ -481,4 +594,4 @@ if (passed && (browserPageErrors || browserWindowErrors || browserUnhandled || b
   process.stderr.write(JSON.stringify({ status: "failed", phase: "late browser or SDK error" }) + "\n");
   process.exitCode = 1;
 }
-if (passed && !process.exitCode) process.stdout.write(JSON.stringify({ status: "passed", browser: "isolated WebKit", sdk: "2.26.0", verifiedSdkPackages, signatureRequests, relayedMessages, browserBlockedFetch, browserBlockedSockets, browserBlockedXhr, browserBlockedBeacon, browserBlockedRoutes, browserBlockedRouteKinds, browserUnhandled, browserWindowErrors, browserPageErrors, nodeBlockedRequests, checks: ["temporary signature", "session guard", "old localStorage preserved", "separate scope cleanup", "browser restart and session restore", "signature after restart", "explicit session disconnect"] }) + "\n");
+if (passed && !process.exitCode) process.stdout.write(JSON.stringify({ status: "passed", browser: "isolated WebKit", sdk: "2.26.0", ephemeralDeepLinkMode, verifiedSdkPackages, signatureRequests, relayedMessages, browserBlockedFetch, browserBlockedSockets, browserBlockedXhr, browserBlockedBeacon, browserBlockedRoutes, browserBlockedRouteKinds, browserUnhandled, browserWindowErrors, browserPageErrors, nodeBlockedRequests, checks: ["explicit Core and ephemeral signature", "ephemeral persistent storage access", "fresh ephemeral attempt", "temporary signature", "session guard", "old localStorage preserved", "separate scope cleanup", "browser restart and session restore", "signature after restart", "explicit session disconnect"] }) + "\n");
