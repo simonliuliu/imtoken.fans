@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
@@ -13,10 +13,39 @@ import {
 } from "@/app/[locale]/auth/actions";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getAuthReturnPath } from "@/lib/auth-navigation";
-import { connectWalletAndSignIn, connectWalletConnectAndSignIn, hasWalletConnectProjectId } from "@/lib/wallet-client";
+import {
+  assertWalletSignInActive,
+  connectWalletAndSignIn,
+  connectWalletConnectAndSignIn,
+  hasWalletConnectProjectId,
+  WalletSignInCancelled,
+  type WalletSignInAttempt,
+} from "@/lib/wallet-client";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/brand-logo";
 import { AuthLoading } from "@/components/auth-loading";
+
+// Keep the redirect barrier alive if this module's sign-in page is unmounted and remounted.
+const pendingWalletAttempts = new Set<WalletSignInAttempt>();
+const pendingWalletListeners = new Set<() => void>();
+
+function subscribePendingWalletAttempts(listener: () => void) {
+  pendingWalletListeners.add(listener);
+  return () => { pendingWalletListeners.delete(listener); };
+}
+
+function hasPendingWalletAttempts() {
+  return pendingWalletAttempts.size > 0;
+}
+
+function trackWalletAttempt(attempt: WalletSignInAttempt, pending: boolean) {
+  const wasPending = hasPendingWalletAttempts();
+  if (pending) pendingWalletAttempts.add(attempt);
+  else pendingWalletAttempts.delete(attempt);
+  if (wasPending !== hasPendingWalletAttempts()) {
+    pendingWalletListeners.forEach((listener) => listener());
+  }
+}
 
 export default function SignInPage() {
   return (
@@ -41,12 +70,6 @@ function SignInForm() {
   const walletConnectAvailable = hasWalletConnectProjectId();
   const { user, loading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace(redirectTo);
-    }
-  }, [loading, user, redirectTo, router]);
-
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [credential, setCredential] = useState<"email" | "username">("email");
   const [busy, setBusy] = useState<string | null>(null);
@@ -59,6 +82,42 @@ function SignInForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const walletAttemptPending = useSyncExternalStore(subscribePendingWalletAttempts, hasPendingWalletAttempts, () => false);
+  const [walletPageHidden, setWalletPageHidden] = useState(false);
+  const walletAttemptRef = useRef<WalletSignInAttempt | null>(null);
+  const walletInterruptedRef = useRef(false);
+
+  useEffect(() => {
+    function handlePageHide() {
+      if (walletAttemptRef.current) {
+        walletAttemptRef.current = null;
+        walletInterruptedRef.current = true;
+        setWalletPageHidden(true);
+      }
+    }
+
+    function handlePageShow() {
+      if (walletInterruptedRef.current) {
+        walletInterruptedRef.current = false;
+        setWalletPageHidden(false);
+        setBusy(null);
+      }
+    }
+
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      walletAttemptRef.current = null;
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user && !walletAttemptPending && !hasPendingWalletAttempts() && !walletPageHidden && !walletAttemptRef.current && !walletInterruptedRef.current) {
+      router.replace(redirectTo);
+    }
+  }, [loading, user, redirectTo, router, walletAttemptPending, walletPageHidden]);
 
   async function handleGoogle() {
     setError(null);
@@ -69,49 +128,40 @@ function SignInForm() {
     setBusy(null);
   }
 
-  async function handleWalletConnect() {
+  async function handleWalletSignIn(kind: "wallet" | "walletconnect") {
+    if (walletAttemptRef.current || walletInterruptedRef.current) return;
+    const attempt: WalletSignInAttempt = { isActive: () => walletAttemptRef.current === attempt };
+    walletAttemptRef.current = attempt;
+    trackWalletAttempt(attempt, true);
     setError(null);
     setInfo(null);
-    setBusy("wallet");
+    setBusy(kind);
     try {
-      await connectWalletAndSignIn({
+      const signIn = kind === "wallet" ? connectWalletAndSignIn : connectWalletConnectAndSignIn;
+      await signIn({
         noInjectedWallet: tw("noInjectedWallet"),
         noAddress: tw("noAddress"),
         noAddressShort: tw("noAddressShort"),
         walletConnectUnavailable: tw("walletConnectUnavailable"),
+        walletConnectUnauthorized: tw("walletConnectUnauthorized"),
+        walletSignInInProgress: tw("walletSignInInProgress"),
+        walletSignInCoordinationUnavailable: tw("walletSignInCoordinationUnavailable"),
         nonceFailed: tw("nonceFailed"),
         verifyFailed: tw("verifyFailed"),
         metadataDescription: tw("metadataDescription"),
-      });
+      }, attempt);
+      assertWalletSignInActive(attempt);
       // 登录成功后沿用本页既有的整页跳转（而不是 router.push）：硬重载能确保服务端组件
       // 一定拿到刚写入的 session cookie。钱包登录在客户端分不清新老用户，统一进 /welcome，
       // 引导页自己判断——已经走过引导的会被直接放行到 redirectTo。
       window.location.href = getAuthReturnPath(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tw("verifyFailed"));
+      if (walletAttemptRef.current !== attempt) return;
+      walletAttemptRef.current = null;
+      setError(err instanceof WalletSignInCancelled ? null : err instanceof Error ? err.message : tw("verifyFailed"));
       setBusy(null);
-    }
-  }
-
-  async function handleWalletConnectScan() {
-    setError(null);
-    setInfo(null);
-    setBusy("walletconnect");
-    try {
-      await connectWalletConnectAndSignIn({
-        noInjectedWallet: tw("noInjectedWallet"),
-        noAddress: tw("noAddress"),
-        noAddressShort: tw("noAddressShort"),
-        walletConnectUnavailable: tw("walletConnectUnavailable"),
-        nonceFailed: tw("nonceFailed"),
-        verifyFailed: tw("verifyFailed"),
-        metadataDescription: tw("metadataDescription"),
-      });
-      // 同上：整页跳转 + 统一进 /welcome 由服务端判断是否需要引导。
-      window.location.href = getAuthReturnPath(`/welcome?redirect=${encodeURIComponent(redirectTo)}`, locale);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : tw("verifyFailed"));
-      setBusy(null);
+    } finally {
+      trackWalletAttempt(attempt, false);
     }
   }
 
@@ -316,7 +366,7 @@ function SignInForm() {
           <div className="flex flex-col gap-2.5 border-t border-line p-3">
             <button
               type="button"
-              onClick={handleWalletConnect}
+              onClick={() => handleWalletSignIn("wallet")}
               disabled={busy !== null || !configured}
               className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -326,7 +376,7 @@ function SignInForm() {
             {walletConnectAvailable ? (
               <button
                 type="button"
-                onClick={handleWalletConnectScan}
+                onClick={() => handleWalletSignIn("walletconnect")}
                 disabled={busy !== null || !configured}
                 className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
