@@ -19,21 +19,21 @@ function IdeaEditor({ idea, busy, onSave, onCancel }: { idea: FeedbackPost; busy
   const [draft, setDraft] = useState<FeedbackEdit>({ title: idea.title, description: idea.description, module: idea.module, status: idea.status, mark: idea.mark, visibility: idea.visibility });
   return <form className={styles.editor} onSubmit={(event) => { event.preventDefault(); void onSave(draft, version.current); }}>
     <h3>{c("editIdea")}</h3><label>{c("titleLabel")}<input required minLength={2} maxLength={120} disabled={busy} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label><label>{c("descriptionLabel")}<textarea required minLength={2} maxLength={5000} disabled={busy} rows={5} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
-    <div className={styles.fields}><label>{c("moduleLabel")}<select disabled={busy} value={draft.module} onChange={(event) => setDraft({ ...draft, module: event.target.value as FeedbackModule })}>{FEEDBACK_MODULES.map((value) => <option key={value} value={value}>{c(`modules.${value}`)}</option>)}</select></label><label>{c("statusLabel")}<select disabled={busy} value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as FeedbackState })}>{FEEDBACK_STATES.map((value) => <option key={value} value={value}>{c(`states.${value}`)}</option>)}</select></label><label>{c("markLabel")}<select disabled={busy} value={draft.mark} onChange={(event) => setDraft({ ...draft, mark: event.target.value as FeedbackMark })}>{FEEDBACK_MARKS.map((value) => <option key={value} value={value}>{c(`marks.${value}`)}</option>)}</select></label></div>
+    <div className={styles.fields}><label>{c("moduleLabel")}<select disabled={busy} value={draft.module} onChange={(event) => setDraft({ ...draft, module: event.target.value as FeedbackModule })}>{FEEDBACK_MODULES.filter((value) => (value === "forum") === (idea.module === "forum")).map((value) => <option key={value} value={value}>{c(`modules.${value}`)}</option>)}</select></label><label>{c("statusLabel")}<select disabled={busy} value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as FeedbackState })}>{FEEDBACK_STATES.map((value) => <option key={value} value={value}>{c(`states.${value}`)}</option>)}</select></label><label>{c("markLabel")}<select disabled={busy} value={draft.mark} onChange={(event) => setDraft({ ...draft, mark: event.target.value as FeedbackMark })}>{FEEDBACK_MARKS.map((value) => <option key={value} value={value}>{c(`marks.${value}`)}</option>)}</select></label></div>
     <label>{t("visibility")}<select disabled={busy} value={draft.visibility} onChange={(event) => setDraft({ ...draft, visibility: event.target.value as "published" | "hidden" })}><option value="published">{t("public")}</option><option value="hidden">{t("hidden")}</option></select></label>
     <div className={styles.actions}><button className={styles.primary} disabled={busy || draft.title.trim().length < 2 || draft.description.trim().length < 2}>{busy ? t("saving") : c("save")}</button><button type="button" disabled={busy} onClick={onCancel}>{c("cancel")}</button></div>
   </form>;
 }
 
 /** Historical filename retained; the active component uses only authenticated real RPCs. */
-export function CooperationPreview(props: { embedded?: boolean; initialId?: string | null; sort?: CommunityFeedSort; overview?: boolean; onOpen?: () => void }) {
+export function CooperationPreview(props: { embedded?: boolean; initialId?: string | null; sort?: CommunityFeedSort; overview?: boolean; scope?: "product" | "forum"; onOpen?: (module: FeedbackModule, id: string | null) => void }) {
   const { user, isAdmin, loading, sessionEpoch } = useAuth();
   const t = useTranslations("feedbackLive");
   if (loading) return <p role="status">{t("loading")}</p>;
   // Identity keys synchronously unmount private data/editors before a new account renders.
-  return <LiveFeedback key={`${user?.id ?? "anonymous"}:${isAdmin}:${sessionEpoch}`} initialId={props.initialId ?? null} owner={user?.id ?? null} feedSort={props.sort ?? "latest"} overview={props.overview ?? false} onOpen={props.onOpen} />;
+  return <LiveFeedback key={`${user?.id ?? "anonymous"}:${isAdmin}:${sessionEpoch}:${props.scope ?? "product"}`} initialId={props.initialId ?? null} owner={user?.id ?? null} feedSort={props.sort ?? "latest"} overview={props.overview ?? false} scope={props.scope ?? "product"} onOpen={props.onOpen} />;
 }
-function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initialId: string | null; owner: string | null; feedSort: CommunityFeedSort; overview: boolean; onOpen?: () => void }) {
+function LiveFeedback({ initialId, owner, feedSort, overview, scope, onOpen }: { initialId: string | null; owner: string | null; feedSort: CommunityFeedSort; overview: boolean; scope: "product" | "forum"; onOpen?: (module: FeedbackModule, id: string | null) => void }) {
   const c = useTranslations("cooperation"); const t = useTranslations("feedbackLive"); const community = useTranslations("community"); const format = useFormatter();
   const [data, setData] = useState<FeedbackData | null>(null);
   const [selected, setSelected] = useState<string | null>(initialId);
@@ -53,10 +53,10 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
   const active = data?.selected; const admin = data?.viewer.can_manage === true;
   const clearEditor = useCallback(() => { setEditing(false); setCommentEdit(null); setReplyTo(null); setCommentBody(""); commentRequest.current = null; setMergeChoice(null); setMergePreview(null); }, []);
   const openIdea = useCallback((id: string | null) => {
-    if (id) onOpen?.();
+    onOpen?.(scope === "forum" ? "forum" : "wallet", id);
     setSelected(id); setCommentOffset(0); clearEditor(); setNotice("");
-    const url = new URL(window.location.href); url.searchParams.set("category", "wallet"); if (id) url.searchParams.set("idea", id); else url.searchParams.delete("idea"); window.history.replaceState(window.history.state, "", url);
-  }, [clearEditor, onOpen]);
+    const url = new URL(window.location.href); url.searchParams.set("category", scope === "forum" ? "forum" : "wallet"); if (id) url.searchParams.set("idea", id); else url.searchParams.delete("idea"); window.history.replaceState(window.history.state, "", url);
+  }, [clearEditor, onOpen, scope]);
   useEffect(() => {
     const timer = setTimeout(() => { if (initialId) setSelected(initialId); }, 0);
     return () => clearTimeout(timer);
@@ -70,13 +70,13 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
     const timer = setTimeout(async () => {
       setLoading(true); setError(""); setErrorCode("");
       try {
-        let result = await readFeedback({ id: selected, sort, offset: feedSort === "recommended" ? 0 : offset, commentOffset });
+        let result = await readFeedback({ id: selected, module: selected ? "all" : scope, sort, offset: feedSort === "recommended" ? 0 : offset, commentOffset });
         // The existing RPC has no editorial-mark filter. Read its pages before
         // filtering so recommendations cannot disappear behind the first page.
         if (feedSort === "recommended" && !selected && result.ok && result.data.viewer.user_id === owner) {
           const combined = [...result.data.posts];
           while (!cancelled && combined.length < result.data.total) {
-            const page = await readFeedback({ sort, offset: combined.length });
+            const page = await readFeedback({ module: scope, sort, offset: combined.length });
             if (!page.ok) { result = page; break; }
             if (page.data.viewer.user_id !== owner) { result = page; break; }
             if (!page.data.posts.length) break;
@@ -88,18 +88,24 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
           }
         }
         if (cancelled) return;
-        if (result.ok && result.data.viewer.user_id === owner) setData(result.data); else if (result.ok) { setData(null); setError(t("sessionChanged")); setErrorCode("session_changed"); } else { setData(null); setError(result.error); setErrorCode(result.code); }
+        if (result.ok && result.data.viewer.user_id === owner) {
+          const target = result.data.selected;
+          if (target && (target.module === "forum") !== (scope === "forum")) {
+            const url = new URL(window.location.href); url.searchParams.set("category", target.module === "forum" ? "forum" : "wallet");
+            window.history.replaceState(window.history.state, "", url); onOpen?.(target.module, target.id);
+          } else setData(result.data);
+        } else if (result.ok) { setData(null); setError(t("sessionChanged")); setErrorCode("session_changed"); } else { setData(null); setError(result.error); setErrorCode(result.code); }
       } catch { if (!cancelled) { setData(null); setError(t("unexpected")); } }
       finally { if (!cancelled) setLoading(false); }
     }, 0);
     return () => { clearTimeout(timer); cancelled = true; };
-  }, [selected, sort, feedSort, offset, commentOffset, reload, t, owner]);
+  }, [selected, sort, feedSort, offset, commentOffset, reload, t, owner, scope, onOpen]);
   useEffect(() => {
     let stale = false;
     if (!active || !admin || active.merge_id) return;
-    const timer = setTimeout(async () => { const result = await readFeedback({ query: mergeQuery, sort: "oldest" }); if (!stale && result.ok && result.data.viewer.user_id === owner) setMergeChoices(result.data.posts.filter((post) => post.id !== active.id && !post.merge_id && post.visibility === "published")); }, 300);
+    const timer = setTimeout(async () => { const result = await readFeedback({ query: mergeQuery, module: scope, sort: "oldest" }); if (!stale && result.ok && result.data.viewer.user_id === owner) setMergeChoices(result.data.posts.filter((post) => post.id !== active.id && !post.merge_id && post.visibility === "published")); }, 300);
     return () => { stale = true; clearTimeout(timer); };
-  }, [active, admin, mergeQuery, owner]);
+  }, [active, admin, mergeQuery, owner, scope]);
   useEffect(() => {
     if (!data || loading || !window.location.hash.startsWith("#comment-")) return;
     document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "center" });
@@ -124,17 +130,21 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
   const author = (name: string | null) => feedbackForumName(name) || t("member");
   const router = useRouter();
   useEffect(() => {
-    const openComposer = () => router.push("/submit/feedback");
+    const openComposer = () => router.push(scope === "forum" ? "/submit/feedback?module=forum" : "/submit/feedback");
     window.addEventListener(FEEDBACK_COMPOSE, openComposer);
-    if (new URLSearchParams(window.location.search).get("composeFeedback") === "1") router.replace("/submit/feedback?resume=1");
+    if (new URLSearchParams(window.location.search).get("composeFeedback") === "1") router.replace(`/submit/feedback?resume=1${scope === "forum" ? "&module=forum" : ""}`);
     return () => window.removeEventListener(FEEDBACK_COMPOSE, openComposer);
-  }, [router]);
-  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(`/community/feedback?category=wallet${selected ? `&idea=${selected}&resumeComment=1` : ""}`)}`;
+  }, [router, scope]);
+  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(`/community/feedback?category=${scope === "forum" ? "forum" : "wallet"}${selected ? `&idea=${selected}&resumeComment=1` : ""}`)}`;
   function renderRow(post: FeedbackPost) {
     return <article key={post.id} className={`${styles.row} community-post-row`} style={{ paddingInline: 0, display: "flex" }}><button type="button" className={styles.vote} disabled={busy} aria-pressed={post.supported} aria-label={c("ideaVote", { title: post.title, count: post.support_count })} onClick={() => void mutate("vote", { id: post.id, supported: !post.supported })}><span aria-hidden>△</span><strong>{format.number(post.support_count)}</strong></button><div className={styles.rowMain}><div className={styles.tags}><span className={styles.status}>{c(`states.${post.status}`)}</span><span>{c(`modules.${post.module}`)}</span>{post.mark !== "none" && <span className={styles.tag}>{c(`marks.${post.mark}`)}</span>}{post.visibility === "hidden" && <span>{t("hidden")}</span>}</div><button type="button" className={styles.ideaTitle} onClick={() => openIdea(post.id)}>{post.title}</button><p className={styles.excerpt}>{post.description}</p><div className={styles.meta}><span>{author(post.author_name)}</span><time dateTime={post.created_at}>{format.dateTime(new Date(post.created_at), { month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time><span>{c("commentCount", { count: post.comment_count })}</span>{post.merge_id && <span>{c("mergedBadge")}</span>}</div></div></article>;
   }
-  return <section className={`${styles.page} ${styles.embedded}`} aria-label={t("heading")} aria-busy={loading || busy}>
-    {overview && <h2 className="border-b border-line py-4 text-sm font-semibold text-muted">{community("categories.wallet")}</h2>}
+  function renderDetails(post: FeedbackPost) {
+    return post.kind && <section aria-label={t("structuredDetails")}><h3>{t("structuredDetails")}</h3><p>{t(post.kind === "bug" ? "kindBug" : "kindSuggestion")}</p>{Object.entries(post.details ?? {}).map(([key, value]) => <p key={key}><strong>{t(`detailFields.${key}`)}</strong>: {key === "device" && value ? t(`devices.${value}`) : value}</p>)}</section>;
+  }
+  return <section className={`${styles.page} ${styles.embedded}`} aria-label={scope === "forum" ? community("categories.forum") : t("heading")} aria-busy={loading || busy}>
+    {overview && <h2 className="border-b border-line py-4 text-sm font-semibold text-muted">{community(scope === "forum" ? "categories.forum" : "categories.wallet")}</h2>}
+    {scope === "forum" && <p className={styles.muted}>{t("forumIntake")}</p>}
     {admin && <p className={styles.adminNotice}>{t("adminNotice")}</p>}
     {error && <div className={styles.error} role="alert"><p>{error}</p>{errorCode === "sign_in" && <Link href={signInHref} onClick={() => { if (!active || !commentBody) return; try { saveFeedbackDraft(`comment:${active.id}`, owner, { body: commentBody, parent: replyTo, request: commentRequest.current }); } catch { setError(t("draftUnavailable")); } }}>{t("signInContinue")}</Link>}<button type="button" onClick={() => setReload((value) => value + 1)}>{t("retry")}</button></div>}
     {notice && <p className={styles.success} role="status">{notice}</p>}
@@ -142,9 +152,10 @@ function LiveFeedback({ initialId, owner, feedSort, overview, onOpen }: { initia
     {data && <>
       {active ? <article className={styles.panel}>
         <button type="button" disabled={busy} className={styles.back} onClick={() => openIdea(null)}>{c("back")}</button><div className={styles.tags}><span className={styles.status}>{c(`states.${active.status}`)}</span><span>{c(`modules.${active.module}`)}</span>{active.mark !== "none" && <span className={styles.tag}>{c(`marks.${active.mark}`)}</span>}{active.visibility === "hidden" && <span>{t("hidden")}</span>}</div><h2 className={styles.detailTitle}>{active.title}</h2><div className={styles.meta}><span>{author(active.author_name)}</span><time dateTime={active.created_at}>{format.dateTime(new Date(active.created_at), { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</time>{active.version > 1 && <span>{t("revision", { version: active.version })}</span>}</div><p className={styles.description}>{active.description}</p>
+        {renderDetails(active)}
         <div className={styles.actions}><button type="button" disabled={busy} className={styles.support} aria-pressed={active.supported} onClick={() => void mutate("vote", { id: active.id, supported: !active.supported })}>△ {c(active.supported ? "supported" : "support")} · {format.number(active.support_count)}</button>{admin && <button type="button" disabled={busy} onClick={() => setEditing(!editing)}>{c("editIdea")}</button>}</div>
         {admin && editing && <IdeaEditor key={active.id} idea={active} busy={busy} onCancel={() => setEditing(false)} onSave={async (change, version) => { if (await mutate("edit", { id: active.id, version, ...change })) setEditing(false); }} />}
-        {data.sources.length > 0 && <section className={styles.mergeBox}><h3>{c("mergeSources")}</h3><p>{t("mergedExplanation")}</p>{data.sources.map((source) => <details key={source.id}><summary>{source.title}</summary><p className={styles.meta}>{author(source.author_name)} · {format.dateTime(new Date(source.created_at), { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</p><p className={styles.body}>{source.description}</p></details>)}{admin && active.merge_id && <button type="button" disabled={busy} onClick={async () => { if (await mutate("unmerge", { id: active.merge_id, version: active.version })) clearEditor(); }}>{c("undoMerge")}</button>}</section>}
+        {data.sources.length > 0 && <section className={styles.mergeBox}><h3>{c("mergeSources")}</h3><p>{t("mergedExplanation")}</p>{data.sources.map((source) => <details key={source.id}><summary>{source.title}</summary><p className={styles.meta}>{author(source.author_name)} · {format.dateTime(new Date(source.created_at), { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Shanghai" })}</p><p className={styles.body}>{source.description}</p>{renderDetails(source)}</details>)}{admin && active.merge_id && <button type="button" disabled={busy} onClick={async () => { if (await mutate("unmerge", { id: active.merge_id, version: active.version })) clearEditor(); }}>{c("undoMerge")}</button>}</section>}
         {admin && !active.merge_id && active.visibility === "published" && <section className={styles.mergeBox}><h3>{c("mergeHeading")}</h3><p>{t("mergeLimit")}</p><label>{t("findMerge")}<input maxLength={120} value={mergeQuery} onChange={(event) => { setMergeQuery(event.target.value); setMergeChoice(null); setMergePreview(null); }} /></label><label>{c("mergeSelect")}<select value={mergeChoice?.id ?? ""} disabled={busy} onChange={(event) => { setMergeChoice(mergeChoices.find((post) => post.id === event.target.value) ?? null); setMergePreview(null); }}><option value="">{c("chooseIdea")}</option>{mergeChoices.map((post) => <option key={post.id} value={post.id}>{post.title}</option>)}</select></label><button type="button" disabled={busy || !mergeChoice} onClick={() => void previewMerge()}>{c("previewMerge")}</button>{mergePreview && mergeChoice && <div className={styles.mergePreview}><h4>{c("mergePreviewTitle")}</h4><p>{c("mergeTarget", { title: mergePreview.id === active.id ? active.title : mergeChoice.title })}</p><p>{c("mergeCounts", { before: active.support_count + mergeChoice.support_count, after: mergePreview.support_count })}</p><p>{c("mergeUndoNote")}</p><div className={styles.actions}><button type="button" className={styles.primary} disabled={busy} onClick={async () => { if (await mutate("merge", { id: active.id, version: active.version, other_id: mergeChoice.id, other_version: mergeChoice.version })) clearEditor(); }}>{c("confirmMerge")}</button><button type="button" disabled={busy} onClick={() => setMergePreview(null)}>{c("cancel")}</button></div></div>}</section>}
         {admin && data.history.length > 0 && <details className={styles.history}><summary>{t("history")}</summary><p>{t("historyLimit")}</p>{data.history.map((entry) => <div key={entry.id}><strong>{t(`audit.${entry.action}`)}</strong> · <time dateTime={entry.created_at}>{format.dateTime(new Date(entry.created_at), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" })}</time>{entry.before_data && <p className={styles.body}>{t("previous")} {String(entry.before_data.title ?? entry.before_data.body ?? "")} {typeof entry.before_data.status === "string" && c(`states.${entry.before_data.status}`)} {typeof entry.before_data.mark === "string" && c(`marks.${entry.before_data.mark}`)}{typeof entry.before_data.description === "string" && `\n${entry.before_data.description}`}</p>}</div>)}</details>}
         <section className={styles.discussion}><h3>{c("discussion", { count: data.comment_total })}</h3><form className={styles.form} onSubmit={submitComment}>{replyTo && <div className={styles.replyTarget}><p>{c("replyingTo", { name: author(replyTo.author_name) })}</p><button type="button" disabled={busy} onClick={() => { setReplyTo(null); commentRequest.current = null; }}>{c("cancelReply")}</button></div>}<label>{c("commentLabel")}<textarea ref={commentInput} required minLength={2} disabled={busy} maxLength={2000} rows={3} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder={c("commentPlaceholder")} /></label><div className={styles.actions}><button type="submit" className={styles.primary} disabled={busy || commentBody.trim().length < 2}>{busy ? t("saving") : c(replyTo ? "sendReply" : "sendComment")}</button><button type="button" disabled={busy} onClick={() => { try { const stored = takeFeedbackDraft<{ body: string; parent: FeedbackComment | null; request: string | null }>(`comment:${active.id}`, owner, Boolean(owner && new URLSearchParams(window.location.search).get("resumeComment") === "1")); if (stored?.body) { setCommentBody(stored.body); setReplyTo(stored.parent ?? null); commentRequest.current = stored.request ?? null; } else setNotice(t("noDraft")); } catch { setError(t("draftUnavailable")); } }}>{t("restoreDraft")}</button></div></form>

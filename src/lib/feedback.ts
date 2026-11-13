@@ -1,4 +1,4 @@
-export const FEEDBACK_MODULES = ["wallet", "transfer", "browser", "other"] as const;
+export const FEEDBACK_MODULES = ["wallet", "transfer", "browser", "other", "forum"] as const;
 export const FEEDBACK_STATES = ["inbox", "evaluating", "planned", "building", "done", "needsInfo", "declined"] as const;
 export const FEEDBACK_MARKS = ["none", "research", "needsInfo", "featured"] as const;
 export type FeedbackModule = typeof FEEDBACK_MODULES[number];
@@ -6,6 +6,7 @@ export type FeedbackState = typeof FEEDBACK_STATES[number];
 export type FeedbackMark = typeof FEEDBACK_MARKS[number];
 export interface FeedbackPost {
   id: string; title: string; description: string; author_name: string | null;
+  kind?: "bug" | "suggestion" | null; details?: Record<string, string> | null;
   module: FeedbackModule; status: FeedbackState; mark: FeedbackMark; visibility: "published" | "hidden";
   created_at: string; updated_at: string; version: number; support_count: number; supported: boolean;
   comment_count: number; merge_id: string | null;

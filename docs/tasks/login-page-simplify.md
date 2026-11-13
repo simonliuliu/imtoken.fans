@@ -22,4 +22,5 @@
 - 界面证据：[中文桌面](../reviews/screenshots/login-page-simplify/zh-desktop.png)、[英文手机宽度](../reviews/screenshots/login-page-simplify/en-mobile.png)。
 - 独立 QA（Sol / high）：认证入口、条件和安全文案静态复核通过；16 项隔离回跳与钱包签名安全回归通过。QA 提出的两项既有辅助技术语义问题已修复并独立复审；320px 导航样式增量也完成独立静态复核。
 - 中英 1,569 键检查、lint、Webpack 生产构建及类型检查通过；构建保留既有 OG 图片 `maxWidth: none` 提示。隔离测试服务在首页启动探测时因虚构产品夹具缺少论坛分类而产生文案提示，不作为正式数据问题。
-- Production 部署尚待确认。真实 Google、邮箱、用户名和钱包账号登录、真实扫码、移动设备及屏幕阅读器实际体验未验证，不以本地虚构夹具替代。
+- 2026-11-06 [PR #46](https://github.com/simonliuliu/imtoken.fans/pull/46) 已合并，精确 main `67da8fe09c375245eac858caec415adc28390613` 的 Production deployment `7596104855` 成功；正式域名中英首页、活动页及带回跳参数的登录页共 6 路径 HTTP 200，登录响应包含新安全提示且不含旧宣传标题，详见 [发布核验](https://github.com/simonliuliu/imtoken.fans/pull/46#issuecomment-6681338834)。
+- 真实 Google、邮箱、用户名和钱包账号登录、真实扫码、移动设备及屏幕阅读器实际体验未验证，不以本地虚构夹具或公开响应检查替代。

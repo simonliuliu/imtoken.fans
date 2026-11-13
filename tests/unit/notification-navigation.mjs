@@ -24,6 +24,8 @@ function load(path, imports = {}, globals = {}) {
 const { safeNotificationHref } = load("../../src/lib/notification-navigation.ts");
 
 const supported = [
+  `/community/feedback?category=forum&idea=${POST}`,
+  `/community/feedback?category=forum&idea=${POST}&commentOffset=50#comment-${COMMENT}`,
   ...["safety", "discussion", "activities", "feedback"].flatMap((section) => [
     `/community/${section}/${POST}`,
     `/community/${section}/${POST}#comment-${COMMENT}`,

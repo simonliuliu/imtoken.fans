@@ -1170,6 +1170,7 @@
       "problem": "What went wrong",
       "situation": "Use case and current experience",
       "appVersion": "imToken / browser version",
+      "forumBrowserVersion": "Browser version",
       "device": "Device or platform",
       "steps": "Steps to reproduce",
       "expected": "Expected result",
@@ -1182,6 +1183,7 @@
     "placeholders": {
       "module": "For example: transfers, assets, or DApp browser",
       "appVersion": "For example: 2.18.0",
+      "forumBrowserVersion": "For example: Chrome 130",
       "steps": "1. Open… 2. Select… 3. Observe…",
       "scenario": "When do you use this feature?",
       "proposal": "How would you improve it?",
@@ -1208,7 +1210,10 @@
     "bugDescriptionPlaceholder": "Describe the unexpected behavior and how it affects you.",
     "suggestionDescriptionPlaceholder": "Describe what feels difficult today and what you would improve.",
     "descriptionTooLong": "The complete feedback is {count} characters; the maximum is 5,000.",
-    "feedbackRequirements": "Title and description each need at least 2 characters. Extra details are optional; the complete description allows up to 5,000 characters."
+    "feedbackRequirements": "Title and description each need at least 2 characters. Extra details are optional; the complete description allows up to 5,000 characters.",
+    "forumFeedbackTitle": "Share forum feedback",
+    "forumFeedbackIntro": "Report an imToken Fans issue or suggest improvements to posts, moderation, growth, and notifications.",
+    "forumFeedbackType": "Forum feedback"
   },
   "community": {
     "demoCommunity": "Community preview",
@@ -1328,7 +1333,8 @@
       "cases": "Cases",
       "guides": "Guides",
       "questionsSafety": "Q&A",
-      "builds": "Community builds"
+      "builds": "Community builds",
+      "forum": "Forum feedback"
     },
     "states": {
       "pending": "To review",
@@ -1659,7 +1665,8 @@
       "wallet": "Wallet management",
       "transfer": "Transfers & transactions",
       "browser": "DApp browser",
-      "other": "Other / unsure"
+      "other": "Other / unsure",
+      "forum": "Forum"
     },
     "states": {
       "inbox": "To organize",
@@ -1779,7 +1786,27 @@
     "checkPublished": "Check published feedback",
     "retryLegacy": "Retry with original ID",
     "reloadDraft": "Reload draft",
-    "persistentDraftUnavailable": "Your browser could not save or restore the draft. Copy your text before leaving. New submissions are sent only after the draft is saved to prevent duplicates."
+    "persistentDraftUnavailable": "Your browser could not save or restore the draft. Copy your text before leaving. New submissions are sent only after the draft is saved to prevent duplicates.",
+    "forumIntake": "Report issues and ideas for imToken Fans itself. Follow actual status updates, and never share private wallet information.",
+    "structuredDetails": "Feedback details",
+    "kindBug": "Bug report",
+    "kindSuggestion": "Suggestion",
+    "detailFields": {
+      "appVersion": "Version",
+      "device": "Device",
+      "steps": "Steps to reproduce",
+      "expected": "Expected result",
+      "actual": "Actual result",
+      "scenario": "Scenario",
+      "proposal": "Proposal",
+      "impact": "Expected benefit"
+    },
+    "devices": {
+      "ios": "iOS",
+      "android": "Android",
+      "browserExtension": "Browser",
+      "other": "Other"
+    }
   },
   "feedbackErrors": {
     "configuration": "The feedback data service is not configured. Contact an admin to connect it and retry.",
@@ -1792,7 +1819,8 @@
     "conflict": "The content changed or this request differs from a saved record. Reload the latest version before retrying to avoid overwriting another edit.",
     "not_found": "This IDEA or comment does not exist or is not currently visible.",
     "parent": "The comment is unavailable or no longer belongs to this IDEA. Choose a reply target again.",
-    "merge_blocked": "This IDEA already participates in a merge. Undo that merge first; chained merges are not supported."
+    "merge_blocked": "This IDEA already participates in a merge. Undo that merge first; chained merges are not supported.",
+    "scope": "Forum feedback and wallet product feedback cannot be moved or merged across scopes."
   },
   "publishPage": {
     "title": "Publish",
