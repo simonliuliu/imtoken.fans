@@ -1,16 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/profile";
 import { isBlacklisted } from "@/lib/user-tags";
 import { normalizeTags } from "@/lib/tag-taxonomy";
-import { runModerationPipeline } from "@/lib/moderation/pipeline";
 import { MAX_SCREENSHOTS, MAX_SOCIAL_LINKS, MAX_TEAM_MEMBERS } from "@/lib/media";
-import { awardXpByRule } from "@/lib/xp";
 import {
   isMakerRelationship,
   isProductLaunchStage,
@@ -187,31 +184,14 @@ export async function createSubmission(
     return { error: t("submitFailed") };
   }
 
-  // 社区产品始终先人工审核，不按旧点子规则免审或写入统一投稿冷却。
-  await runModerationPipeline({
-    targetType: "submission",
-    targetId: inserted.id,
-    content: `${title}\n${tagline}\n\n${description}`,
-    authorId: profile.id,
-    requireManual: true,
-  });
+  // 0033 creates the human review queue in the same transaction as insertion.
 
   // 查询实际状态，避免与管理员同步审核发生竞争时向用户展示过时状态。
   const { data: finalRow } = await supabase.from("submissions").select("status").eq("id", inserted.id).maybeSingle();
-  const published = finalRow?.status === "published";
-
-  // 发布成功才给经验；还在审核队列里的等审核通过时由 moderateQueueItem 补上。
-  // refId = 提交 id，所以两条路径都调用也只会计一次分。
-  if (published) {
-    after(() =>
-      awardXpByRule({
-        userId: profile.id,
-        action: "submission_product",
-        refType: "submission",
-        refId: inserted.id,
-      })
-    );
+  if (!finalRow || (finalRow.status !== "pending" && finalRow.status !== "published")) {
+    return { error: t("submissionReviewChanged") };
   }
+  const published = finalRow?.status === "published";
 
   return { submissionId: inserted.id, published };
 }

@@ -23,14 +23,14 @@ function loadModule(path, imports = {}) {
   return testModule.exports;
 }
 
-function setup({ signedIn = true, blacklisted = false, duplicate = false } = {}) {
+function setup({ signedIn = true, blacklisted = false, duplicate = false, finalStatus = "pending" } = {}) {
   const calls = { auth: 0, clients: 0, inserts: [], moderation: [], xp: [], adminTables: [] };
   const builder = (admin) => {
     const query = {
       select() { return query; }, eq() { return query; }, is() { return query; }, limit() { return query; },
       insert(value) { calls.inserts.push(value); return query; },
       async single() { return { data: { id: "new-product-id" }, error: null }; },
-      async maybeSingle() { return { data: admin ? (duplicate ? { id: "existing-product" } : null) : { status: "pending" }, error: null }; },
+      async maybeSingle() { return { data: admin ? (duplicate ? { id: "existing-product" } : null) : finalStatus === null ? null : { status: finalStatus }, error: null }; },
     };
     return query;
   };
@@ -70,16 +70,25 @@ test("old or forged idea requests are rejected before auth, database, moderation
   }
 });
 
-test("valid product is persisted only as product and always requires manual moderation, even for admin", async () => {
+test("valid product is persisted as product; database owns the atomic human review queue", async () => {
   const { createSubmission, calls } = setup();
   const result = await createSubmission(product());
   assert.equal(result.submissionId, "new-product-id");
   assert.equal(result.published, false);
   assert.equal(calls.inserts.length, 1);
   assert.equal(calls.inserts[0].type, "product");
-  assert.equal(calls.moderation[0].requireManual, true);
+  assert.equal(calls.moderation.length, 0);
   assert.equal(calls.adminTables.includes("profiles"), false);
   assert.equal(calls.xp.length, 0);
+});
+
+test("product result reflects a concurrent publication or reports an unconfirmed review state", async () => {
+  const published = setup({ finalStatus: "published" });
+  assert.equal((await published.createSubmission(product())).published, true);
+  for (const finalStatus of ["rejected", null]) {
+    const instance = setup({ finalStatus });
+    assert.equal((await instance.createSubmission(product())).error, "submissionReviewChanged");
+  }
 });
 
 test("required product details still fail validation without writes", async () => {

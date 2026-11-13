@@ -51,7 +51,7 @@ export async function softDeleteContent(params: SoftDeleteParams): Promise<{ err
   // 已经在回收站里了就当成功——两个人同时点删除、或者举报处理里连带删除，不该报错。
   if (row.deleted_at) return {};
 
-  const { error } = await admin
+  const { data: changed, error } = await admin
     .from(table)
     .update({
       deleted_at: new Date().toISOString(),
@@ -60,14 +60,18 @@ export async function softDeleteContent(params: SoftDeleteParams): Promise<{ err
       deleted_prev_status: row.status,
       status: "rejected",
     })
-    .eq("id", id);
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!changed) return { error: "内容状态已经变化，请刷新后重试" };
 
   // 内容没了，它带来的经验也要收回，否则「发一堆水内容拿分，被删了分还留着」。
   // revokeXp 是幂等的（流水上打 revoked_at），重复删除不会重复扣。
   const authorId = authorIdOf(kind, row);
-  if (authorId) await revokeContentXp(kind, id, authorId);
+  if (authorId && kind === "comment") await revokeContentXp(kind, id, authorId);
 
   await admin.from("admin_logs").insert({
     admin_id: actorId,
@@ -96,7 +100,7 @@ export async function restoreContent(kind: ContentKind, id: string, actorId: str
 
   const restoredStatus = (row.deleted_prev_status as SubmissionStatus | null) ?? "pending";
 
-  const { error } = await admin
+  const { data: changed, error } = await admin
     .from(table)
     .update({
       deleted_at: null,
@@ -105,14 +109,18 @@ export async function restoreContent(kind: ContentKind, id: string, actorId: str
       deleted_prev_status: null,
       status: restoredStatus,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("deleted_at", row.deleted_at)
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!changed) return { error: "内容状态已经变化，请刷新后重试" };
 
   // 恢复成"已发布"才把经验补回去。恢复成 pending 的先不给，
   // 等审核通过时由 moderateQueueItem 那条路径补（避免绕过审核先拿分）。
   const authorId = authorIdOf(kind, row);
-  if (authorId && restoredStatus === "published") {
+  if (authorId && kind === "comment" && restoredStatus === "published") {
     await awardXpByRule({
       userId: authorId,
       action:

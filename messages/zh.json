@@ -1035,6 +1035,7 @@
     "productAlreadySubmitted": "这个产品链接已经提交过了，请前往现有产品页或联系管理员处理归属",
     "submitCooldown": "提交太频繁了，请在 {until} 之后再试",
     "submitFailed": "提交失败",
+    "submissionReviewChanged": "投稿已收到，状态暂时无法确认，请到个人主页查看审核结果。",
     "statsUsersInvalid": "用户数必须是非负数字",
     "statsDauInvalid": "日活必须是非负数字",
     "submissionNotFoundOrNotOwner": "未找到该提交，或者你不是它的所有者",
