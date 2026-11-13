@@ -160,6 +160,10 @@ function handle(ws, message) {
     const guardModule={exports:{}};
     vm.runInNewContext(ts.transpileModule(guardSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:guardModule,exports:guardModule.exports,require});
     const guard=guardModule.exports.walletConnectSessionAllowsSignIn;
+    const scopedSource=fs.readFileSync(path.join(projectRoot,'src/lib/walletconnect-scoped-storage.ts'),'utf8');
+    const scopedModule={exports:{}};
+    vm.runInNewContext(ts.transpileModule(scopedSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:scopedModule,exports:scopedModule.exports,crypto:crypto.webcrypto,Uint8Array});
+    const scopeStorage=scopedModule.exports.scopeWalletConnectStorage;
     const account=privateKeyToAccount(generatePrivateKey());
     const common={projectId:'00000000000000000000000000000000',relayUrl:'ws://127.0.0.1:'+allowedPort,logger:'silent',telemetryEnabled:false};
     phase='wallet init';
@@ -228,10 +232,12 @@ function handle(ws, message) {
     // Use the SDK's default global-core behavior for these two-attempt probes.
     // A distinct prefix alone does not necessarily isolate a shared backend.
     delete process.env.DISABLE_GLOBAL_CORE;
-    async function runStorageIsolation(shared) {
-      const label=shared?'shared-storage':'separate-storage';
-      const oldStore=new MemoryStorage();
-      const newStore=shared?oldStore:new MemoryStorage();
+    async function runStorageIsolation(mode) {
+      const shared=mode==='shared';
+      const label=mode+'-storage';
+      const backend=new MemoryStorage();
+      const oldStore=mode==='scoped'?scopeStorage(backend,'a'.repeat(32)):backend;
+      const newStore=shared?oldStore:mode==='scoped'?scopeStorage(backend,'b'.repeat(32)):new MemoryStorage();
       async function init(name,storage) {
         const provider=await waitFor(UniversalProvider.init({...common,storage,customStoragePrefix:label+'-'+name,disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}}),label+' init');
         clients.push(provider.client);
@@ -271,7 +277,7 @@ function handle(ws, message) {
       oldProvider.abortPairingAttempt();
       phase=label+' new approval';
       const newer=await approve(start(newProvider));
-      const newKeys=(await newStore.getKeys()).filter(key=>key.startsWith('wc@2:universal_provider:')&&key.includes(newer.topic));
+      const newKeys=Array.from(await newStore.getKeys()).filter(key=>key.startsWith('wc@2:universal_provider:')&&key.includes(newer.topic));
       assert(newKeys.length>0,'the newer session must have actual provider state in storage');
       const sign=()=>newProvider.request({method:'personal_sign',params:[stringToHex(syntheticChallenge),account.address]},'eip155:1');
       phase=label+' sign before cleanup';
@@ -282,6 +288,12 @@ function handle(ws, message) {
       const oldDeleted=eventOnce(wallet,'session_delete');
       await waitFor(oldProvider.disconnect(),label+' old disconnect');
       assert.equal((await waitFor(oldDeleted,label+' old deletion')).topic,older.topic);
+      if(mode==='scoped') {
+        await oldStore.close();
+        assert.equal(oldStore.closed,true);
+        await oldStore.setItem('late callback','discarded');
+        assert.equal((await backend.getKeys()).some(key=>key.includes('a'.repeat(32))),false);
+      }
       const after=new Set(await newStore.getKeys());
       const removedNewKeys=newKeys.filter(key=>!after.has(key));
       if(shared) assert(removedNewKeys.length>0,'shared backend must expose the cross-attempt cleanup hazard');
@@ -315,9 +327,11 @@ function handle(ws, message) {
       await waitFor(newProvider.disconnect(),label+' new disconnect');
       assert.equal((await waitFor(newDeleted,label+' new deletion')).topic,newer.topic);
       assert.equal(wallet.session.getAll().some(item=>item.topic===newer.topic),false);
+      if(mode==='scoped') await newStore.close();
     }
-    await runStorageIsolation(true);
-    await runStorageIsolation(false);
+    await runStorageIsolation('shared');
+    await runStorageIsolation('separate');
+    await runStorageIsolation('scoped');
     phase='same-prefix global core';
     const firstStorage=new MemoryStorage(),ignoredStorage=new MemoryStorage();
     const samePrefixOptions={...common,customStoragePrefix:'same-prefix-fixture',disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}};
@@ -329,10 +343,10 @@ function handle(ws, message) {
     assert.notEqual(secondProvider.client.core.storage,ignoredStorage);
     await new Promise(resolve=>setTimeout(resolve,30));
     assert.equal(unexpectedRejections.length,0);
-    assert.equal(signatureRequests,6);
+    assert.equal(signatureRequests,9);
     assert.equal(challengeVisibleOnRelay,false);
     assert(pubCount>12);
-    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',separateStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
+    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',isolatedStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','scoped views retain new provider state on a shared backend','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
   } catch(error) {
     const diagnostic=String(error?.message||'').replace(/(?:wc:|https?:\/\/)\S+/gi,'[redacted]').replace(/(?:0x)?[a-f0-9]{24,}/gi,'[redacted]').slice(0,180);
     const walletError=unexpectedRejections.at(-1);

@@ -95,3 +95,12 @@
 - 独立 QA 复跑最终脚本，实际 worker 自然退出 0；12 组主控及一组 SIGKILL 兜底控制符合预期。共享 Storage 人为恢复被删键、独立 Storage 人为删除新键均触发断言失败；抑制签名响应、失败后挂起、虚假成功后挂起、重复成功/未知状态、无结果 exit 0 和相互矛盾的结果均未被 runner 误报为成功。忽略 SIGTERM 的虚构 worker 由 runner 终止且保持失败；未称其 SDK session 已清理。最终 worker SHA256 `e937d3d67391ac2e670fac5a3e04f62cfbf1fae2dd4f06005a596ba9abb48a5a`，runner SHA256 `62f437d8495be26e44877298e1e29152b1a9d72ba1fafee61e01417a1066c81f`，独立证据在 `/private/tmp/imtoken-wc-runner-independent-qa.GOzXLY`。
 - 模拟 relay 不代表实际服务，14 次 SDK Verify fetch 被拦截；系统规则允许其他回环端口且不限制文件访问。未验证真实钱包/手机、二维码隐私、屏幕阅读器、跨标签、旧尝试的 nonce/verify/跳转隔离、服务器会话竞态或 pairing 全量清理。现有钱包 Zod 3 的 11 个 high 审计传播节点没有减少，PR #48 仍为草稿，不能合并或称正式修复。
 - 本批由当前聊天执行，沿用用户所述界面选择 Terra Max；本轮接口没有返回主会话可见的具体运行型号或强度。独立 QA 复用既有 `zod_security_review` 子 agent，没有修改个人全局模型配置或调用设计渠道。
+
+## 2026-11-13 钱包尝试隔离 Storage 候选
+
+- 新增尚未接入登录流程的 `src/lib/walletconnect-scoped-storage.ts`，为共享异步键值后端提供按尝试隔离的 SDK 视图。scope 使用 Web Crypto 生成 16 个随机字节，随机源不可用时失败；逻辑键按 UTF-16 编码为稳定物理键，避免底层 unstorage 对斜杠、反斜杠、冒号、问号及空键的规范化碰撞。各视图只返回自身逻辑键；`getEntries` 先筛选键再逐项读取自身值，跳过 undefined，结果不是原子快照。底层 `getKeys` 仍枚举整个后端，不是同源代码间的权限或保密边界。
+- 视图内操作按顺序执行；`close()` 开始即标记退役，等待已开始的后端操作后仅清理自身键，清理失败明确返回错误且可重试。退役后 SDK 的晚到读取为空、写入和删除为空操作，以免 SDK 的后台调用产生未处理拒绝或重建旧数据；已开始的读取若在退役后返回也不会交回旧值。`closed` 只表示已退役，不表示清理成功或 SDK 已停止；未来调用方必须独立验证尝试归属，并在 nonce、签名、verify 和跳转前拒绝旧结果。重复使用同一 scope、另一个视图或其他同源代码可绕过此视图的生命周期，不能把它当安全授权。
+- 12 项隔离单元检查覆盖随机源失败、scope/逻辑键注入、隔离枚举和清理、真实 WalletConnect Node 内存后端的键规范化往返、损坏键、在途读写和清理失败重试；真实 UniversalProvider/SignClient 2.26.0 经模拟 relay 的第 8 场景在同一虚构底层 Storage 上使用两个隔离视图及不同 SDK prefix，旧尝试断开与退役后，新会话的 Provider 键、签名及同客户端重建仍可用。该测试不证明完整 SDK 模块级缓存或真实浏览器重启安全。专项 lint 与 TypeScript 检查通过。
+- 独立 QA 复跑 12 项单元和真实 SDK 的 8 个隔离场景均通过；取消枚举过滤、跨 scope 删除、编码碰撞、不等待在途写及吞掉清理异常五个源码负控均被检出。实现文件 SHA256 `9066a7a5486e3d16867b98eea2b200bb304a84257f46487e017fe48bbbc42132`，单元脚本 `b0e4f73b2c890082606ea317e4196ade67b1e485a87136d50fdfac580cdef569`，协议脚本 `5a919f5f95832f08cb609372550cc7b891a02d9389bfa3126a5a7a2edb6f8736`；独立证据在 `/private/tmp/imtoken-scoped-storage-independent-qa.VerSj6`。验证源码与最终源码仅差安全说明注释。
+- 此候选尚未替换现有项目钱包 SDK、界面或锁文件，也未接入真实登录；不改变 11 个 high 审计传播节点。持久化后端会保存敏感会话材料，随机 scope 不加密；重启恢复、孤儿 scope 回收、跨标签并发、SDK 全局 Core/模块缓存、晚到会话与 pairing 清理、手机和真实钱包仍待设计与验收。PR #48 保持草稿，不能合并或称线上修复。
+- 本批由当前聊天执行，沿用用户所述界面选择 Terra Max；本轮接口没有返回主会话可见的具体运行型号或强度。独立 QA 复用既有 `zod_security_review` 子 agent，没有修改个人全局模型配置或调用设计渠道。
