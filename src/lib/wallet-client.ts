@@ -26,7 +26,7 @@ interface Eip1193Provider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 }
 
-/** Optional lifecycle supplied by a future cancellable wallet UI.
+/** Optional lifecycle supplied by the wallet sign-in caller.
  * isActive must identify this attempt and remain false once it is retired.
  */
 export interface WalletSignInAttempt {

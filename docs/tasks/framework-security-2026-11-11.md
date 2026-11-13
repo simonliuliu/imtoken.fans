@@ -134,6 +134,15 @@
 - 独立 QA 复跑最终脚本自然退出 0；混入项目旧 SDK、错误签名、错误恢复 scope、浏览器后台同步异常、最后采样后的 Promise 拒绝和成功标记后的 Promise 拒绝六项协议负控均退出 1。QA 发现初版只在页面关闭前取一次未处理错误快照，可能漏掉迟到拒绝；已改为页面生命周期内实时上报、保留 Playwright `pageerror` 并在清理后复查，两个迟到拒绝负控均被检出。runner 的唯一正常成功、虚假成功挂起、失败挂起、SIGKILL 兜底、重复或未知结果、非零退出等 9 项独立控制符合预期。最终 worker SHA256 `e40537311e4f810e27d9c4bcb068ea06132a62d57ef7017e1466ff0baad6dfc9`，runner SHA256 `d358c715888c898f422148805043fdf374011dd4405255e8137db7376db62f12`；证据在 `/private/tmp/imtoken-browser-protocol-independent-qa.zdV5Hr`。
 - 本批由当前聊天执行，沿用用户所述界面选择 Terra Max；本轮接口未返回主会话可见的具体运行型号或强度。独立 QA 复用既有 `zod_security_review` 子 agent，没有修改个人全局模型配置或调用设计渠道。
 
+## 2026-11-13 钱包登录页生命周期接入候选
+
+- 两种现有钱包入口现在各自传入唯一尝试归属；组件卸载或收到 `pagehide` 时同步退役旧归属，已在途的钱包连接、nonce、签名、verify 和断开仍由原客户端等待完成，并在既有异步边界重新检查。成功后立即在整页跳转前复查归属；旧尝试的失败不会修改新页面或新尝试的提示。重复点击在页面内立即拒绝。返回 `pageshow` 后恢复控件，没有新增可见取消按钮或改变 SDK、扫码界面和文案。
+- 用户状态的自动 `router.replace` 在同一页面模块内等待全部钱包尝试完成，模块级集合在组件卸载和同模块重挂后仍保留在途状态；每个尝试仅在自身 `finally` 中移除。独立 QA 在初版发现：`pageshow` 过早清除等待状态时，用户已认证而旧 WalletConnect 断开仍挂起，可提前自动跳转；最终实现按实际在途集合等待，第二次尝试被锁拒绝也不会清除旧尝试的等待状态。原有浏览器锁仍负责钱包互斥，页面集合不替代该锁。
+- 项目 Node 22.23.3、系统禁止网络及临时 WebKit 下，真实登录页与真实 wallet-client 配合虚构 provider、会话、HTTP 和 Action 的 `tests/browser/wallet-sign-in-page.mjs` 通过 19 场景，包含两种入口的成功、卸载及晚到结果、模拟 pagehide/pageshow、断开期间已有用户、同模块重挂、被锁拒绝的重试、密码/Google 路径和已发 verify 的模拟写入。钱包客户端取消边界隔离回归 19 项通过。另在禁止非回环网络、本机虚构认证 API 的 Next 开发页以 WebKit 完成中英桌面/窄屏、密码、Google、导航及校验 9 项；测试账号和数据均为虚构。旧认证夹具仍产生先前记录的缺少模拟帖子分类提示，不能据此推断真实内容问题。
+- 独立 QA 复跑最终页面及浏览器脚本 19/19，并在临时副本验证 3 项负控：移除自动跳转屏障、错误清空其他在途尝试、卸载后保留旧归属均触发测试失败。独立证据在 `/private/tmp/imtoken-wallet-page-final-qa.1d11gwxm`。最终页面 SHA256 `c294a582c5dfbc929ba7458412dc318fd7b5c75604eae965f38794aca3f48011`，浏览器脚本 SHA256 `d6396445feb979cae9ae1b34ad19c25e1b74cd49d596da5dd5ab01de49b5f624`；QA 所测 wallet-client SHA256 `2d215023c75b184eacd619113f0205fa011588494b56be9332778940da6d23b7`，之后只更新其接口说明注释，最终 SHA256 `c9aeb83072aab7bd02232ae9ef20ca8a8dea33020217e9b500bfef61b5c9344c`。中英 1,572 键检查、完整 lint 及最终页面的受影响 lint、无网络 Webpack 构建与其 TypeScript 检查通过；构建保留既有 OG `maxWidth: none` 提示。
+- 测试以人为事件模拟 pagehide/pageshow，未验真实 BFCache；页面集合仅限同一 JavaScript 模块实例，不覆盖新文档、其他标签、旧 bundle 或其他浏览器。verify 已发出后仍可能写入服务器会话，退役和停止主动跳转不能撤销该副作用；断开失败或挂起、SDK 后台停止、真实钱包/手机/二维码及真实 Supabase 仍未验收。默认 SDK 双标签旧存储迁移的安全基线仍失败，两个 Zod 3 导致的 11 个 high 审计传播节点仍未解决，0037 正式预检/迁移、旧部署入口与安全回退仍待核验；PR #48 保持草稿，不是线上修复。
+- 本批由当前聊天执行，沿用用户所述界面选择 Terra Max；本轮接口未返回主会话可见的具体运行型号或强度。独立 QA 复用既有 `zod_security_review` 子 agent，没有修改个人全局模型配置或调用设计渠道。
+
 ## 2026-11-13 钱包浏览器存储值编码候选
 
 - 为独立 IndexedDB 后端和 scope 视图增加尚未接入登录的值编码层 `src/lib/walletconnect-storage-codec.ts`，复用当前锁定的 `@walletconnect/safe-json@1.0.2` 与 `destr@2.0.5`，分别作为明确的直接依赖。两者原本已在生产依赖树中，锁文件仅增加根依赖声明，没有更换已有包版本。该层按默认 SDK 1.1.1 浏览器 IndexedDB 分支分别处理写入、单项读取和条目枚举；枚举保留 null/undefined，单项读取将 null 当作缺失，枚举仍是非原子快照。
