@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import { webcrypto } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
@@ -29,8 +29,12 @@ const ownerModule = load("src/lib/walletconnect-attempt-owner.ts", {
 });
 const { createWalletConnectAttemptOwner } = ownerModule;
 const { createWalletConnectAttemptCoordinator } = coordinatorModule;
-const sessionTopic = "a".repeat(64), selfKey = "b".repeat(64), pairingTopic = "c".repeat(64);
-const uri = `wc:${pairingTopic}@2?relay-protocol=irn&symKey=${"d".repeat(64)}`;
+const sessionTopic = "a".repeat(64), selfKey = "b".repeat(64);
+const pairingKey = "d".repeat(64);
+const pairingTopic = createHash("sha256").update(Buffer.from(pairingKey, "hex")).digest("hex");
+const pairingExpiry = Math.floor(Date.now() / 1000) + 300;
+const uriFor = (topic = pairingTopic, key = pairingKey, expiry = pairingExpiry) => `wc:${topic}@2?expiryTimestamp=${expiry}&relay-protocol=irn&symKey=${key}`;
+const uri = uriFor();
 const reject = (promise, name) => assert.rejects(promise, { name });
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 function deferred() {
@@ -45,7 +49,7 @@ function fixture() {
   const core = {
     storage: undefined,
     customStoragePrefix: "",
-    crypto: { keychain: { has: (key) => keys.has(key) } },
+    crypto: { keychain: { has: (key) => keys.has(key), get: (key) => keys.has(key) ? pairingKey : undefined } },
     expirer: { has: (key) => expiry.has(key) },
     heartbeat: { stop() { calls.push("heartbeat"); } },
     relayer: { subscriber: { isKnownTopic: async (key) => known.has(key) }, async transportClose() { calls.push("transport"); } },
@@ -61,7 +65,8 @@ function fixture() {
     async cleanupPendingPairings(input) { assert.equal(input.deletePairings, true); calls.push("pairing"); clearPairing(); },
   };
   const setConnected = () => {
-    state.session = session; state.sessions = [session]; state.pairings = [{ topic: pairingTopic }];
+    state.session = session; state.sessions = [session];
+    state.pairings = [{ topic: pairingTopic, expiry: pairingExpiry, relay: { protocol: "irn" }, active: false }];
     for (const key of [sessionTopic, selfKey, pairingTopic]) keys.add(key);
     for (const key of [sessionTopic, pairingTopic]) { expiry.add(key); known.add(key); }
   };
@@ -214,6 +219,167 @@ test("invalid URI retires the attempt and keeps ownership blocked", async () => 
   busy(coordinator);
 });
 
+for (const [name, alter] of [
+  ["duplicate key", () => ({ value: `${uri}&symKey=${pairingKey}` })],
+  ["unknown parameter", () => ({ value: `${uri}&redirect=evil` })],
+  ["encoded parameter", () => ({ value: uri.replace("symKey=", "sym%4Bey=") })],
+  ["fragment", () => ({ value: `${uri}#fragment` })],
+  ["trailing newline", () => ({ value: `${uri}\n` })],
+  ["missing expiry", () => ({ value: `wc:${pairingTopic}@2?relay-protocol=irn&symKey=${pairingKey}` })],
+  ["incorrect relay", () => ({ value: uri.replace("relay-protocol=irn", "relay-protocol=other") })],
+  ["wrong key", () => ({ value: uriFor(pairingTopic, "e".repeat(64)) })],
+  ["unowned topic", () => ({ value: uriFor("f".repeat(64)) })],
+  ["topic unrelated to matching stored key", (f) => { f.state.pairings[0].topic = "f".repeat(64); f.core.crypto.keychain.get = () => pairingKey; return { value: uriFor("f".repeat(64)) }; }],
+  ["expired", (f) => { const value = Math.floor(Date.now() / 1000) - 1; f.state.pairings[0].expiry = value; return { value: uriFor(pairingTopic, pairingKey, value) }; }],
+  ["excessive lifetime", (f) => { const value = Math.floor(Date.now() / 1000) + 601; f.state.pairings[0].expiry = value; return { value: uriFor(pairingTopic, pairingKey, value) }; }],
+  ["stored expiry mismatch", (f) => { f.state.pairings[0].expiry++; return {}; }],
+  ["already active pairing", (f) => { f.state.pairings[0].active = true; return {}; }],
+  ["unsupported methods", (f) => { f.state.pairings[0].methods = ["wc_sessionPropose"]; return {}; }],
+  ["stored relay mismatch", (f) => { f.state.pairings[0].relay.protocol = "other"; return {}; }],
+  ["unexpected relay data", (f) => { f.state.pairings[0].relay.data = "abcd"; return {}; }],
+  ["missing stored key", (f) => { f.core.crypto.keychain.get = () => undefined; return {}; }],
+  ["asynchronous stored key", (f) => { f.core.crypto.keychain.get = () => Promise.reject(new Error("synthetic key")); return {}; }],
+  ["thrown asynchronous pairing read", (f) => { f.provider.client.pairing.getAll = () => { throw Promise.reject(new Error("synthetic thrown pairing")); }; return {}; }],
+  ["asynchronous pairing fields", (f) => { f.state.pairings[0].expiry = Promise.reject(new Error("synthetic expiry")); f.state.pairings[0].relay = Promise.reject(new Error("synthetic relay")); return {}; }],
+  ["duplicate stored pairing", (f) => { f.state.pairings.push({ ...f.state.pairings[0] }); return {}; }],
+]) {
+  test(`URI ${name} cannot reach the renderer`, async () => {
+    const f = fixture();
+    f.options.connect = async () => {
+      f.setConnected();
+      const result = alter(f);
+      f.state.listener(result.value ?? uri);
+      return f.session;
+    };
+    const { coordinator, handle } = begin(f);
+    await reject(handle.result, "WalletConnectAttemptCleanupFailed");
+    await tick();
+    assert.equal(f.state.uriCount, 0);
+    assert.equal(f.state.authCount, 0);
+    busy(coordinator);
+  });
+}
+
+test("cancellation while inspecting the stored URI key prevents renderer delivery", async () => {
+  const f = fixture();
+  let current = true;
+  f.core.crypto.keychain.get = () => { current = false; return pairingKey; };
+  const coordinator = createWalletConnectAttemptCoordinator();
+  const handle = coordinator.start({ isCurrent: () => current, create: () => createWalletConnectAttemptOwner(f.options) });
+  await reject(handle.result, "WalletConnectAttemptCancelled");
+  await handle.released;
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+});
+
+test("cancellation during the final stored key lookup prevents renderer delivery", async () => {
+  const f = fixture();
+  let current = true, calls = 0;
+  f.core.crypto.keychain.get = () => { if (++calls === 2) current = false; return pairingKey; };
+  const coordinator = createWalletConnectAttemptCoordinator();
+  const handle = coordinator.start({ isCurrent: () => current, create: () => createWalletConnectAttemptOwner(f.options) });
+  await reject(handle.result, "WalletConnectAttemptCancelled");
+  await handle.released;
+  assert.equal(calls, 2);
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+});
+
+test("a lifecycle predicate throwing a rejected Promise is consumed and prevents URI delivery", async () => {
+  const f = fixture();
+  let inspected = false;
+  f.core.crypto.keychain.get = () => { inspected = true; return pairingKey; };
+  const coordinator = createWalletConnectAttemptCoordinator();
+  const handle = coordinator.start({
+    isCurrent: () => { if (inspected) throw Promise.reject(new Error("synthetic lifecycle")); return true; },
+    create: () => createWalletConnectAttemptOwner(f.options),
+  });
+  await reject(handle.result, "WalletConnectAttemptCancelled");
+  await handle.released;
+  await tick();
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+});
+
+test("a renderer throwing a rejected Promise is consumed and prevents authentication", async () => {
+  const f = fixture();
+  f.options.onUri = () => { throw Promise.reject(new Error("synthetic renderer callback")); };
+  const { handle } = begin(f);
+  await reject(handle.result, "WalletConnectAttemptCancelled");
+  await handle.released;
+  await tick();
+  assert.equal(f.state.authCount, 0);
+});
+
+test("a renderer getter that cancels is read before SDK initialization", async () => {
+  const f = fixture();
+  let current = true, calls = 0;
+  Object.defineProperty(f.options, "onUri", { get() { current = false; return () => { calls++; }; } });
+  const coordinator = createWalletConnectAttemptCoordinator();
+  const handle = coordinator.start({ isCurrent: () => current, create: () => createWalletConnectAttemptOwner(f.options) });
+  await reject(handle.result, "WalletConnectAttemptCancelled");
+  await handle.released;
+  assert.equal(calls, 0);
+  assert.equal(f.calls.includes("core"), false);
+});
+
+test("a rejecting renderer getter is consumed before SDK initialization", async () => {
+  const f = fixture();
+  Object.defineProperty(f.options, "onUri", { get() { return Promise.reject(new Error("synthetic renderer")); } });
+  const { handle } = begin(f);
+  await reject(handle.result, "WalletConnectAttemptFailed");
+  await handle.released;
+  await tick();
+  assert.equal(f.calls.includes("core"), false);
+});
+
+test("a renderer getter throwing a rejected Promise is consumed before SDK initialization", async () => {
+  const f = fixture();
+  Object.defineProperty(f.options, "onUri", { get() { throw Promise.reject(new Error("synthetic thrown renderer")); } });
+  const { handle } = begin(f);
+  await reject(handle.result, "WalletConnectAttemptFailed");
+  await handle.released;
+  await tick();
+  assert.equal(f.calls.includes("core"), false);
+});
+
+test("pairing activation during stored key lookup prevents renderer delivery", async () => {
+  const f = fixture();
+  f.core.crypto.keychain.get = () => { f.state.pairings[0].active = true; return pairingKey; };
+  const { coordinator, handle } = begin(f);
+  await reject(handle.result, "WalletConnectAttemptCleanupFailed");
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+  busy(coordinator);
+});
+
+test("Core ownership drift during lifecycle check prevents renderer delivery", async () => {
+  const f = fixture();
+  let checkedStoredKey = false;
+  f.core.crypto.keychain.get = () => { checkedStoredKey = true; return pairingKey; };
+  const coordinator = createWalletConnectAttemptCoordinator();
+  const handle = coordinator.start({
+    isCurrent: () => { if (checkedStoredKey) f.provider.client.core = {}; return true; },
+    create: () => createWalletConnectAttemptOwner(f.options),
+  });
+  await reject(handle.result, "WalletConnectAttemptCleanupFailed");
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+  busy(coordinator);
+});
+
+test("Core ownership drift during the final pairing lookup prevents renderer delivery", async () => {
+  const f = fixture();
+  const getAll = f.provider.client.pairing.getAll;
+  let calls = 0;
+  f.provider.client.pairing.getAll = () => { if (++calls === 4) f.provider.client.core = {}; return getAll(); };
+  const { coordinator, handle } = begin(f);
+  await reject(handle.result, "WalletConnectAttemptCleanupFailed");
+  assert.equal(f.state.uriCount, 0);
+  assert.equal(f.state.authCount, 0);
+  busy(coordinator);
+});
+
 test("an asynchronous URI callback is consumed and prevents authentication", async () => {
   const f = fixture();
   f.options.onUri = () => Promise.reject(new Error("synthetic UI"));
@@ -342,6 +508,21 @@ for (const stage of ["disconnect", "pairing", "transport"]) {
   });
 }
 
+for (const stage of ["connect", "onConnected", "disconnect", "pairing", "transport"]) {
+  test(`${stage} throwing a rejected Promise is consumed and retains ownership`, async () => {
+    const f = fixture();
+    const fail = () => { throw Promise.reject(new Error("synthetic thrown SDK work")); };
+    if (stage === "connect" || stage === "onConnected") f.options[stage] = fail;
+    if (stage === "disconnect") f.provider.disconnect = fail;
+    if (stage === "pairing") f.provider.cleanupPendingPairings = fail;
+    if (stage === "transport") f.core.relayer.transportClose = fail;
+    const { coordinator, handle } = begin(f);
+    await reject(handle.result, "WalletConnectAttemptCleanupFailed");
+    await tick();
+    busy(coordinator);
+  });
+}
+
 test("Core ownership drift while transport closes cannot deliver success", async () => {
   const f = fixture(), gate = deferred(), started = deferred();
   f.core.relayer.transportClose = () => { started.resolve(); return gate.promise; };
@@ -361,7 +542,12 @@ test("too many distinct URI topics retire the attempt and retain ownership", asy
   f.options.connect = async () => {
     f.setConnected();
     for (let index = 0; index <= 256; index++) {
-      f.state.listener(`wc:${index.toString(16).padStart(64, "0")}@2?relay-protocol=irn&symKey=${"d".repeat(64)}`);
+      const key = index.toString(16).padStart(64, "0");
+      const topic = createHash("sha256").update(Buffer.from(key, "hex")).digest("hex");
+      f.state.pairings = [{ topic, expiry: pairingExpiry, relay: { protocol: "irn" }, active: false }];
+      f.keys.add(topic);
+      f.core.crypto.keychain.get = () => key;
+      f.state.listener(uriFor(topic, key));
     }
     return f.session;
   };

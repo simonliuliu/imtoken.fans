@@ -25,6 +25,38 @@ function deferred() {
 }
 function owner(run = async () => "value", close = async () => {}) { return { run, close }; }
 
+test("an options getter throwing a rejected Promise is consumed before ownership", async () => {
+  const coordinator = createWalletConnectAttemptCoordinator();
+  assert.throws(() => coordinator.start({ get create() { throw Promise.reject(new Error("synthetic getter")); } }), { name: "WalletConnectAttemptFailed" });
+  await tick();
+  assert.equal(await coordinator.start({ create: () => owner() }).result, "value");
+});
+
+test("run throwing a rejected Promise is consumed and the owner is cleaned", async () => {
+  const coordinator = createWalletConnectAttemptCoordinator();
+  let closes = 0;
+  const handle = coordinator.start({ create: () => owner(() => { throw Promise.reject(new Error("synthetic run")); }, async () => { closes++; }) });
+  await rejected(handle.result, "WalletConnectAttemptFailed");
+  await handle.released;
+  await tick();
+  assert.equal(closes, 1);
+});
+
+test("close throwing a rejected Promise is consumed and retains the slot until retry", async () => {
+  const coordinator = createWalletConnectAttemptCoordinator();
+  let closes = 0;
+  const handle = coordinator.start({ create: () => owner(async () => "value", () => {
+    if (++closes === 1) throw Promise.reject(new Error("synthetic close"));
+    return Promise.resolve();
+  }) });
+  await rejected(handle.result, "WalletConnectAttemptCleanupFailed");
+  await tick();
+  busy(coordinator);
+  await handle.retryCleanup();
+  await handle.released;
+  assert.equal(closes, 2);
+});
+
 test("a successful result waits for owned cleanup and holds the slot", async () => {
   const coordinator = createWalletConnectAttemptCoordinator();
   const gate = deferred();

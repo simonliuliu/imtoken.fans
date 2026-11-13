@@ -60,6 +60,10 @@ function rejectAsyncValue(value: unknown): boolean {
   return true;
 }
 
+function consumeThrown(value: unknown): void {
+  try { rejectAsyncValue(value); } catch { /* Invalid thenable; remain failed. */ }
+}
+
 /**
  * The factory must synchronously return an owner before starting SDK work.
  * If ownership cannot be obtained, this coordinator remains blocked because
@@ -97,7 +101,8 @@ export function createWalletConnectAttemptCoordinator() {
           typeof create !== "function" || (isCurrent !== undefined && typeof isCurrent !== "function")) {
         throw new Error();
       }
-    } catch {
+    } catch (error) {
+      consumeThrown(error);
       active = undefined;
       lease.state = "finished";
       throw new WalletConnectAttemptFailed();
@@ -124,7 +129,8 @@ export function createWalletConnectAttemptCoordinator() {
         }
         if (active !== lease || lease.retired || !phaseAllowed() || !signalIsActive()) throw new Error();
         return true;
-      } catch {
+      } catch (error) {
+        consumeThrown(error);
         lease.retired = true;
         return false;
       }
@@ -137,7 +143,8 @@ export function createWalletConnectAttemptCoordinator() {
         try {
           if (typeof callback !== "function" || rejectAsyncValue(callback())) throw new Error();
           return current();
-        } catch {
+        } catch (error) {
+          consumeThrown(error);
           lease.retired = true;
           return false;
         }
@@ -150,7 +157,8 @@ export function createWalletConnectAttemptCoordinator() {
         const pending = lease.close?.();
         if (!isPromiseLike(pending)) throw new Error();
         await pending;
-      } catch {
+      } catch (error) {
+        consumeThrown(error);
         lease.state = "cleanup-failed";
         throw new WalletConnectAttemptCleanupFailed();
       }
@@ -182,7 +190,8 @@ export function createWalletConnectAttemptCoordinator() {
         if (!isPromiseLike(pending)) throw new Error();
         value = await pending;
         context.assertActive();
-      } catch {
+      } catch (error) {
+        consumeThrown(error);
         failed = true;
       }
 
