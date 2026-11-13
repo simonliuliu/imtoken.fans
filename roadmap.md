@@ -332,3 +332,7 @@ PR #31已将普通帖/产品/反馈发布修复整合至main。本地3000已获�
 ## 2026-11-13 独立依赖安全补丁
 
 在 #43 回复与通知修复合入 main `5eb16bd` 后，独立分支提取 #48 已完成的纯依赖升级；不等待尚未完成的钱包重构或0037。Next/eslint16.4.6、follow-redirects1.16.3、根Zod4.6.7和限定minimatch11.0.8的安装、双语1569键、lint、构建/类型、91相关单元及独立QA通过；合入#43后补受影响组件与组合构建检查。既有钱包11个high继续列为待办，正式库、真实钱包和手机未因此标记验收。范围及回退见 [本批任务](docs/tasks/dependency-security-release.md)，Production以实际PR和聊天发布记录为准。
+
+2026-11-13 WalletConnect 显式资源 owner 候选：尚未接入业务，按尝试持有独立内存 storage/Core，验证所有权并分步检查本地 session/pairing、key、expiry 和订阅后再结束约定清理；未知工作或歧义失败继续阻断。32 项隔离单元、真实 2.26 虚构 relay 的 10 场景及独立晚到批准、安全负控通过；这不证明远端 pairing 删除或 SDK 全部停止。默认旧 deeplink 和旧存储迁移检查仍失败，依赖审计、0037 正式预检/迁移及真实钱包/手机仍待验收；PR #48 保持草稿。详见 [安全任务卡](docs/tasks/framework-security-2026-11-11.md)。
+
+2026-11-13 PR #48 主线同步：已保留 PR #43 回复与通知修复及 PR #49 已发布依赖补丁，合入 main `779cb8e` 后 93 项回复/通知回归、中英 1,572 键、完整 lint、无网络 Webpack 构建/TypeScript 与独立合并 QA 通过；钱包候选仍未发布。

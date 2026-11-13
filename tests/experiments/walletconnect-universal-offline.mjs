@@ -154,6 +154,7 @@ function handle(ws, message) {
     assert.equal(versionOf('@walletconnect/universal-provider'),'2.26.0');
     const {SignClient}=fixtureRequire('@walletconnect/sign-client');
     const {UniversalProvider}=fixtureRequire('@walletconnect/universal-provider');
+    const {Core}=fixtureRequire('@walletconnect/core');
     const {privateKeyToAccount,generatePrivateKey}=fixtureRequire('viem/accounts');
     const {verifyMessage,stringToHex}=fixtureRequire('viem');
     const guardSource=fs.readFileSync(path.join(projectRoot,'src/lib/walletconnect-session.ts'),'utf8');
@@ -168,6 +169,21 @@ function handle(ws, message) {
     const scopedModule={exports:{}};
     vm.runInNewContext(ts.transpileModule(scopedSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:scopedModule,exports:scopedModule.exports,crypto:crypto.webcrypto,Uint8Array});
     const scopeStorage=scopedModule.exports.scopeWalletConnectStorage;
+    const loadProjectModule=(file,imports={})=>{
+      const source=fs.readFileSync(path.join(projectRoot,file),'utf8');
+      const target={exports:{}};
+      const localRequire=id=>Object.prototype.hasOwnProperty.call(imports,id)?imports[id]:require(id);
+      vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
+        {module:target,exports:target.exports,require:localRequire,crypto:crypto.webcrypto,Uint8Array,Map,Set,Promise,Error,Object,Array,setTimeout});
+      return target.exports;
+    };
+    const ephemeralModule=loadProjectModule('src/lib/walletconnect-ephemeral-storage.ts');
+    const codecModule=loadProjectModule('src/lib/walletconnect-storage-codec.ts');
+    const ownerModule=loadProjectModule('src/lib/walletconnect-attempt-owner.ts',{
+      '@/lib/walletconnect-ephemeral-storage':ephemeralModule,
+      '@/lib/walletconnect-scoped-storage':scopedModule.exports,
+      '@/lib/walletconnect-storage-codec':codecModule,
+    });
     const account=privateKeyToAccount(generatePrivateKey());
     const common={projectId:'00000000000000000000000000000000',relayUrl:'ws://127.0.0.1:'+allowedPort,logger:'silent',telemetryEnabled:false};
     phase='wallet init';
@@ -289,6 +305,61 @@ function handle(ws, message) {
     assert.equal(stalePublications,0);
     assert.equal(signAfterCancellation,0);
     assert.equal(await coordinator.start({create:()=>({run:async()=>'new-attempt',close:async()=>{}})}).result,'new-attempt');
+    // Exercise the actual project owner with an explicit Core, isolated
+    // in-memory storage and one synthetic session.
+    phase='owned Core setup';
+    const ownerCoordinator=makeCoordinator();
+    let ownedCore,ownedProvider,ownedUriReady,ownedAuthReady,releaseOwnedAuth;
+    const ownedUriPromise=new Promise(resolve=>{ownedUriReady=resolve;});
+    const ownedAuthPromise=new Promise(resolve=>{ownedAuthReady=resolve;});
+    const ownedAuthGate=new Promise(resolve=>{releaseOwnedAuth=resolve;});
+    const ownedHandle=ownerCoordinator.start({create:()=>ownerModule.createWalletConnectAttemptOwner({
+      createCore(storage,prefix){
+        ownedCore=new Core({...common,storage,customStoragePrefix:prefix});
+        clients.push({core:ownedCore});
+        return ownedCore;
+      },
+      async createProvider(core){
+        ownedProvider=await UniversalProvider.init({...common,core,disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}});
+        return ownedProvider;
+      },
+      connect(current){return current.connect({namespaces:{eip155:{chains:['eip155:1'],methods:['personal_sign'],events:['accountsChanged','chainChanged'],rpcMap:{'1':'http://127.0.0.1:1'}}}});},
+      onUri(uri){ownedUriReady(uri);},
+      async onConnected(_provider,session,context){context.assertActive();ownedAuthReady(session);await ownedAuthGate;context.assertActive();return 'owned-result';},
+    })});
+    ownedHandle.result.catch(()=>{});
+    const ownedUri=await waitFor(ownedUriPromise,'owned URI');
+    const ownedProposalPromise=eventOnce(wallet,'session_proposal');
+    await waitFor(wallet.pair({uri:ownedUri}),'owned wallet pair');
+    const ownedProposal=await waitFor(ownedProposalPromise,'owned proposal');
+    const ownedApproval=await waitFor(wallet.approve({id:ownedProposal.id,namespaces:{eip155:{accounts:[`eip155:1:${account.address}`],methods:['personal_sign'],events:['accountsChanged','chainChanged']}}}),'owned approval');
+    const ownedSession=await waitFor(ownedAuthPromise,'owned connected');
+    await waitFor(ownedApproval.acknowledged(),'owned acknowledgement');
+    await waitForWalletAcknowledgement(ownedSession.topic);
+    assert.equal(ownedProvider.client.core,ownedCore);
+    assert.equal(ownedCore.crypto.keychain.has(ownedSession.topic),true);
+    const ownedDeleted=eventOnce(wallet,'session_delete');
+    phase='owned Core cleanup';
+    releaseOwnedAuth();
+    try {
+      assert.equal(await waitFor(ownedHandle.result,'owned result'),'owned-result');
+    } catch(error) {
+      process.stderr.write(JSON.stringify({phase:'owned cleanup local state',sessions:ownedProvider.client.session.getAll().length,
+        pairings:ownedProvider.client.pairing.getAll().length,sessionKey:ownedCore.crypto.keychain.has(ownedSession.topic),
+        selfKey:ownedCore.crypto.keychain.has(ownedSession.self.publicKey),pairingKey:ownedCore.crypto.keychain.has(ownedSession.pairingTopic),
+        sessionExpiry:ownedCore.expirer.has(ownedSession.topic),pairingExpiry:ownedCore.expirer.has(ownedSession.pairingTopic),
+        sessionKnown:await ownedCore.relayer.subscriber.isKnownTopic(ownedSession.topic),pairingKnown:await ownedCore.relayer.subscriber.isKnownTopic(ownedSession.pairingTopic)})+'\n');
+      throw error;
+    }
+    await waitFor(ownedHandle.released,'owned release');
+    assert.equal((await waitFor(ownedDeleted,'owned wallet deletion')).topic,ownedSession.topic);
+    assert.equal(ownedProvider.client.session.getAll().length,0);
+    assert.equal(ownedProvider.client.pairing.getAll().length,0);
+    assert.equal(ownedCore.crypto.keychain.has(ownedSession.topic),false);
+    assert.equal(ownedCore.crypto.keychain.has(ownedSession.self.publicKey),false);
+    assert.equal(ownedCore.crypto.keychain.has(ownedSession.pairingTopic),false);
+    assert.equal(await ownedCore.relayer.subscriber.isKnownTopic(ownedSession.topic),false);
+    assert.equal(await ownedCore.relayer.subscriber.isKnownTopic(ownedSession.pairingTopic),false);
     // Use the SDK's default global-core behavior for these two-attempt probes.
     // A distinct prefix alone does not necessarily isolate a shared backend.
     delete process.env.DISABLE_GLOBAL_CORE;
@@ -406,7 +477,7 @@ function handle(ws, message) {
     assert.equal(signatureRequests,9);
     assert.equal(challengeVisibleOnRelay,false);
     assert(pubCount>12);
-    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',isolatedStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','coordinator retains the slot through late approval and controlled cleanup','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','scoped views retain new provider state on a shared backend','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
+    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',isolatedStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','coordinator retains the slot through late approval and controlled cleanup','owned Core session and pairing local cleanup','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','scoped views retain new provider state on a shared backend','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
   } catch(error) {
     const diagnostic=String(error?.message||'').replace(/(?:wc:|https?:\/\/)\S+/gi,'[redacted]').replace(/(?:0x)?[a-f0-9]{24,}/gi,'[redacted]').slice(0,180);
     const walletError=unexpectedRejections.at(-1);

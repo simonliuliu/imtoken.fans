@@ -2,6 +2,8 @@
 
 日期：2026-11-11。工作目录：`/Users/simonliu/.codex/worktrees/forum-next-security/imtoken.fans`；分支：`codex/next-security-patch`。从已发布主线 `67da8fe09c375245eac858caec415adc28390613` 创建，属于现有上线安全检查，不替代论坛反馈、治理或媒体任务。
 
+2026-11-13 主线更新：独立依赖补丁已由 PR #49 合并并发布到 main `779cb8e03a1ecd72fc8a8bc0272bf465756dc006`，Production deployment `7760530521` 成功；回复和通知修复此前由 PR #43 发布到 main `5eb16bdfbea61cdf3cd2e4601759daf8cc7d044c`。下方旧框架“尚未发布”描述是当时的历史，PR #48 继续承载尚未发布的钱包安全、兼容性及 0037 候选，不重复提取已上线依赖补丁。
+
 ## 发现与范围
 
 - 主线锁定 Next.js 16.3.8，命中三个 Next 安全公告。独立 QA 确认项目使用 App Router 和 Server Actions，符合 [Server Actions 拒绝服务公告](https://github.com/advisories/GHSA-p3m5-59mp-jv5r)列出的代码前提；没有进行线上攻击测试。
@@ -187,3 +189,14 @@
 - Node 22.23.3、系统禁网下 30 项隔离单元、受影响文件 lint 和 TypeScript 通过。真实 UniversalProvider/SignClient 2.26.0、系统仅允许本机回环的虚构 relay 和临时钱包下，取消后钱包仍批准旧连接：协调器在迟到批准和受控挂起的清理结束前拒绝新尝试，不交付迟到回调或发起后续签名；释放清理后确认双方所测 session 删除，随后允许新尝试。整体协议实验 9 个场景自然退出 0；该场景 owner 只等待 session disconnect，SDK Core 心跳/传输在测试夹具退出时另行关闭，不证明 pairing 或全部 SDK 资源已清除。SDK 的 20 次 Verify 外部尝试被拦截，其他账号、服务、relay 与签名均为虚构。
 - 独立 QA 发现初版并发非法 Promise 参数存在未处理拒绝、清理失败后旧业务 context 仍能回调，均已修复并独立复测；逐项读取时后续 getter 抛错及异常 aborted 属性也有受影响回归。最终独立复跑 30 项单元、9 项 2.26 协议场景自然退出 0；六类源码负控（占位、取消、清理等待、owner 比较、业务阶段、未知 owner 阻塞）均按预期失败。真实协议删除清理等待的负控也检出提前放行；其有界父进程终止自己的 worker 并保持失败，不计作清理成功。两步虚构清理对照中断开成功一次、存储清理第一次失败后重试一次，协调器在成功前不释放，旧失败结果不恢复；步骤记录是 owner 契约，不是协调器自动完成的 SDK 清理。证据 `/private/tmp/imtoken-attempt-coordinator-qa.d_cut6lg/README.md`。
 - 最终协调器 SHA256 `3557c360d0c71095b9c61a8aeb6e9939e26f791b96955d7dfe4c6c80348469f5`，单元 `a8819ff3fbefd70311f8bcd3797ca5076f58ac8316a3b310d8aa2dad650213d5`，协议 `769fed5d763e4f17369fb397a97e7790fa6eafbacdbacfa79710615102d3625b`。当前 SDK、扫码 UI、业务接入和依赖未替换；旧 SDK 双标签迁移及默认旧 deeplink 安全检查仍失败，11 个 high 依赖传播节点、0037 正式预检/迁移、旧部署和回退、真实钱包/手机仍待处理。PR #48 保持草稿，不得合并或称线上修复。
+
+## 2026-11-13 WalletConnect 显式资源 owner 候选
+
+- 新增尚未接入登录业务的 `src/lib/walletconnect-attempt-owner.ts`，与既有尝试协调器组合：先同步建立 owner，再为每次尝试建立独立内存 storage、值编码层和随机 prefix，单次构造 Core、初始化 Provider 和连接；核对实际 `provider.client.core`、Core storage 和 prefix，发现未知或漂移的资源时不触碰外来资源并阻断释放。只卸载本 owner 注册的 URI listener；捕获 topic 而不保存完整 URI，最多记录 256 个 pairing topic，session/self/pairing 标识限定 64 位小写十六进制。这里只检查 URI 的 topic 形状，未来界面仍须验证完整 URI、不记录连接密钥。
+- 签名前记录本地 session topic、self key 和 pairing topic；分步等待当前 session 断开、发起本地 pairing 清理、核对 session/pairing Store、已捕获 key、expiry 和 active/pending/cached subscription，再停止 heartbeat、关闭 transport 和退役内存 storage。SDK 的 pairing 清理方法会吞错并触发异步删除，因此仅在实际本地组合检查完成后继续，短暂等待后仍未完成则失败并保留槽位；`expirer.has` 自身会吞内部错误，不能单独证明清理。远端 pairing 删除、所有后台任务停止和内存中全部密钥副本清除均不在该结论内。
+- 清理进度只在步骤成功后记账，重试不重复已证实断开；断开拒绝后 session 已消失时不能推断后续密钥清理已完成，保持歧义阻断。同步抛错或非 Promise 的异步契约可能已启动未跟踪工作，此时保留 owner 和槽位，不用超时冒充结束；跨异步边界复查 Core/provider 所有权。未知初始化、持续挂起或歧义失败可能无限阻塞，未来调用方须在现有共享钱包锁中等待 `released` 并提供可追溯恢复。调用方仍须使用实际授权 session/账户/链 guard，且在 nonce、签名、verify、导航和 UI 回调边界检查尝试；本批未实现新的登录流程。
+- Node 22.23.3、系统禁网 32 项单元、受影响 lint 与 TypeScript 通过；真实 Core/UniversalProvider/SignClient 2.26.0、虚构本机 relay 和临时钱包的 10 场景、9 次虚构签名自然退出 0，新增场景核对独立 Core/storage、双方所测 session 删除与本地 session/self/pairing key、pairing Store 和 subscription 状态。SDK 21 次 Verify 外部尝试被拦截；系统允许其他本机回环端口，测试不是文件系统隔离。
+- 独立 QA 发现初版异步契约同步失败可丢失隐藏工作、transport 等待期间所有权漂移仍可释放，均已修复并复测。最终独立复跑 32 项单元、10 项协议场景及 17 个定向病例；6 类源码负控（错误 Core、跳过本地残留检查、不卸载 listener、取消未跟踪工作阻断、删除所有权复查、删除 URI 数量上限）均按预期失败。另用真实 2.26 的独立虚构 relay 场景验证取消后钱包才批准：不进入 `onConnected`，迟到 URI 不交付，受控 disconnect 未完成前仍占位；完成后核对双方所测 session、本地 pairing/key/expiry/subscription，之后才允许新尝试。证据 `/private/tmp/imtoken-attempt-owner-qa.5oe728qu/README.md`。
+- 最终 owner SHA256 `f6ca40586fab2edb78774f65c9c50a0e42081cf3da0abc229443b2081c817e68`，单元 `be06d35f59780970890e6ae7558039c7b446426ebb684a38c31fdb7422bcc9d7`，协议 `a69dfcb51ab9c6fea66f19347bbe423c3b94b4d49ef934d42f7ae730e4b48c42`。当前 SDK、扫码 UI、业务接入和依赖未替换；原 SDK 双标签旧存储迁移及默认旧 deeplink 安全检查仍失败，11 个 high 依赖传播节点、0037 正式预检/迁移、旧部署和回退、真实钱包/手机仍待处理。PR #48 保持草稿，不得合并或称线上修复。当前聊天沿用用户所述界面选择 Terra Max；本接口未返回主会话可见运行型号或强度，独立 QA 复用既有子 agent，未修改个人全局配置。
+
+- 本批开发期间同步已发布 main `779cb8e`（合并提交 `8adef38`），保留 PR #43 回复/通知组件与 PR #49 依赖版本，以及本分支原有两项直接依赖。93 项回复/通知隔离回归、中英 1,572 键、完整 lint、无网络 Webpack 构建及 TypeScript 通过；构建保留既有 OG `maxWidth: none` 提示。独立合并 QA 核对依赖、锁文件、组件与双方路线图，未发现阻塞；证据 `/private/tmp/imtoken-merge-security-qa.rmoit4c3/README.md`。这些是分支整合检查，不代表真实钱包/账号/手机或数据库验收。
