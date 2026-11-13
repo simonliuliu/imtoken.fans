@@ -1,6 +1,7 @@
 // Isolated, synthetic protocol experiment. No real wallet or service is contacted.
 // Use a separately installed 2.26.0 fixture; this does not modify project dependencies.
 // The local broker models only the messages needed here, not the production relay.
+// Run through walletconnect-universal-offline-runner.mjs for bounded failure cleanup.
 import net from 'node:net';
 import tls from 'node:tls';
 import dns from 'node:dns';
@@ -15,6 +16,12 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+if (process.env.IMTOKEN_WALLET_OFFLINE_WORKER !== '1') {
+  process.stderr.write('Use walletconnect-universal-offline-runner.mjs\n');
+  process.exit(2);
+}
+const projectRoot=process.env.IMTOKEN_WALLET_QA_PROJECT_ROOT||path.resolve(__dirname,'../..');
+if (!path.isAbsolute(projectRoot)) throw new Error('QA project root must be absolute');
 const require = createRequire(import.meta.url);
 const fixtureRoot = process.env.WALLETCONNECT_TEST_DEPS_ROOT;
 if (!fixtureRoot || !path.isAbsolute(fixtureRoot)) {
@@ -123,6 +130,9 @@ function handle(ws, message) {
   const clients=[];
   let success;
   let failure;
+  let signatureRequests=0;
+  let signaturesCreated=0;
+  let signatureResponses=0;
   const server = new WebSocketServer({host:'127.0.0.1',port:0});
   await eventOnce(server,'listening');
   allowedPort=server.address().port;
@@ -146,7 +156,7 @@ function handle(ws, message) {
     const {UniversalProvider}=fixtureRequire('@walletconnect/universal-provider');
     const {privateKeyToAccount,generatePrivateKey}=fixtureRequire('viem/accounts');
     const {verifyMessage,stringToHex}=fixtureRequire('viem');
-    const guardSource=fs.readFileSync(path.join(__dirname,'../../src/lib/walletconnect-session.ts'),'utf8');
+    const guardSource=fs.readFileSync(path.join(projectRoot,'src/lib/walletconnect-session.ts'),'utf8');
     const guardModule={exports:{}};
     vm.runInNewContext(ts.transpileModule(guardSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:guardModule,exports:guardModule.exports,require});
     const guard=guardModule.exports.walletConnectSessionAllowsSignIn;
@@ -155,7 +165,14 @@ function handle(ws, message) {
     phase='wallet init';
     const wallet=await waitFor(SignClient.init({...common,storage:new MemoryStorage(),customStoragePrefix:'wallet',metadata:{name:'Synthetic wallet',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}}),'wallet init');
     clients.push(wallet);
-    let signatureRequests=0;
+    async function waitForWalletAcknowledgement(topic) {
+      const deadline=Date.now()+10000;
+      while(Date.now()<deadline) {
+        if(wallet.session.get(topic)?.acknowledged===true) return;
+        await new Promise(resolve=>setTimeout(resolve,20));
+      }
+      throw new Error('Timed out: wallet session acknowledgement');
+    }
     wallet.on('session_request',async event => {
       signatureRequests++;
       try {
@@ -163,7 +180,9 @@ function handle(ws, message) {
         assert.equal(event.params.chainId,'eip155:1');
         const raw=event.params.request.params[0];
         const result=await account.signMessage({message:{raw}});
+        signaturesCreated++;
         await wallet.respond({topic:event.topic,response:{id:event.id,jsonrpc:'2.0',result}});
+        signatureResponses++;
       } catch(error) { unexpectedRejections.push(error); }
     });
     async function runScenario({name, methods, chain, abort=false, sign=false}) {
@@ -185,6 +204,7 @@ function handle(ws, message) {
       const approval=await wallet.approve({id:proposal.id,namespaces:{eip155:{accounts:[`eip155:${chain}:${account.address}`],methods,events:['accountsChanged','chainChanged']}}});
       const session=await waitFor(sessionPromise,'dapp session');
       await waitFor(approval.acknowledged(),'wallet acknowledgement');
+      await waitForWalletAcknowledgement(session.topic);
       assert.equal(guard(session,account.address),sign||abort);
       if (sign) {
         phase=name+' signature';
@@ -205,14 +225,119 @@ function handle(ws, message) {
     await runScenario({name:'missing-method',methods:[],chain:1});
     await runScenario({name:'wrong-chain',methods:['personal_sign'],chain:137});
     await runScenario({name:'late-after-abort',methods:['personal_sign'],chain:1,abort:true});
+    // Use the SDK's default global-core behavior for these two-attempt probes.
+    // A distinct prefix alone does not necessarily isolate a shared backend.
+    delete process.env.DISABLE_GLOBAL_CORE;
+    async function runStorageIsolation(shared) {
+      const label=shared?'shared-storage':'separate-storage';
+      const oldStore=new MemoryStorage();
+      const newStore=shared?oldStore:new MemoryStorage();
+      async function init(name,storage) {
+        const provider=await waitFor(UniversalProvider.init({...common,storage,customStoragePrefix:label+'-'+name,disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}}),label+' init');
+        clients.push(provider.client);
+        return provider;
+      }
+      const oldProvider=await init('old',oldStore);
+      const newProvider=await init('new',newStore);
+      assert.notEqual(oldProvider.client.core,newProvider.client.core);
+      assert.equal(oldProvider.client.core.storage===newProvider.client.core.storage,shared);
+      const start=provider=>{
+        const uri=eventOnce(provider,'display_uri');
+        const session=provider.connect({namespaces:{eip155:{chains:['eip155:1'],methods:['personal_sign'],events:['accountsChanged','chainChanged'],rpcMap:{'1':'http://127.0.0.1:1'}}}});
+        session.catch(()=>{});
+        return {uri,session};
+      };
+      async function approve(attempt) {
+        phase=label+' awaiting URI';
+        const uri=await waitFor(attempt.uri,label+' URI');
+        const proposal=eventOnce(wallet,'session_proposal');
+        phase=label+' pairing wallet';
+        await waitFor(wallet.pair({uri}),label+' wallet pair');
+        phase=label+' awaiting proposal';
+        const pending=await waitFor(proposal,label+' proposal');
+        phase=label+' approving proposal';
+        const approval=await wallet.approve({id:pending.id,namespaces:{eip155:{accounts:[`eip155:1:${account.address}`],methods:['personal_sign'],events:['accountsChanged','chainChanged']}}});
+        phase=label+' awaiting session';
+        const session=await waitFor(attempt.session,label+' session');
+        phase=label+' acknowledging session';
+        await waitFor(approval.acknowledged(),label+' acknowledgement');
+        await waitForWalletAcknowledgement(session.topic);
+        assert.equal(guard(session,account.address),true);
+        return session;
+      }
+      phase=label+' old connect and cancel';
+      const oldAttempt=start(oldProvider);
+      await waitFor(oldAttempt.uri,label+' old URI');
+      oldProvider.abortPairingAttempt();
+      phase=label+' new approval';
+      const newer=await approve(start(newProvider));
+      const newKeys=(await newStore.getKeys()).filter(key=>key.startsWith('wc@2:universal_provider:')&&key.includes(newer.topic));
+      assert(newKeys.length>0,'the newer session must have actual provider state in storage');
+      const sign=()=>newProvider.request({method:'personal_sign',params:[stringToHex(syntheticChallenge),account.address]},'eip155:1');
+      phase=label+' sign before cleanup';
+      assert.equal(await verifyMessage({address:account.address,message:syntheticChallenge,signature:await waitFor(sign(),label+' sign before cleanup')}),true);
+      phase=label+' late old approval';
+      const older=await approve(oldAttempt);
+      assert.notEqual(older.topic,newer.topic);
+      const oldDeleted=eventOnce(wallet,'session_delete');
+      await waitFor(oldProvider.disconnect(),label+' old disconnect');
+      assert.equal((await waitFor(oldDeleted,label+' old deletion')).topic,older.topic);
+      const after=new Set(await newStore.getKeys());
+      const removedNewKeys=newKeys.filter(key=>!after.has(key));
+      if(shared) assert(removedNewKeys.length>0,'shared backend must expose the cross-attempt cleanup hazard');
+      else assert.deepEqual(removedNewKeys,[],'separate backend must retain the newer provider state');
+      assert(newProvider.client.session.getAll().some(item=>item.topic===newer.topic));
+      assert(wallet.session.getAll().some(item=>item.topic===newer.topic));
+      phase=label+' sign after cleanup';
+      assert.equal(await verifyMessage({address:account.address,message:syntheticChallenge,signature:await waitFor(sign(),label+' sign after cleanup')}),true);
+      // Reconstruct from the same SignClient session, forcing UniversalProvider
+      // to read its namespaces from the tested storage rather than live memory.
+      phase=label+' reconstruct provider';
+      const restored=await waitFor(UniversalProvider.init({...common,client:newProvider.client,session:newer,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}}),label+' restore');
+      if(shared) {
+        phase=label+' inspect restored namespaces';
+        assert.equal(Object.keys(restored.namespaces||{}).length,0);
+        assert.equal(Object.keys(restored.optionalNamespaces||{}).length,0);
+        phase=label+' inspect restored session';
+        assert.equal(restored.session.topic,newer.topic);
+      } else {
+        assert(restored.namespaces?.eip155||restored.optionalNamespaces?.eip155);
+      }
+      // This SDK can rebuild an EIP-155 provider from the live session even
+      // after its persisted namespace options are gone; check signing as well.
+      phase=label+' inspect restored chain provider';
+      assert(restored.getProvider('eip155'));
+      phase=label+' restored signature';
+      const restoredSign=()=>waitFor(restored.request({method:'personal_sign',params:[stringToHex(syntheticChallenge),account.address]},'eip155:1'),label+' restored signature');
+      if(shared) await assert.rejects(restoredSign,{name:'TypeError',message:/undefined.*includes/});
+      else assert.equal(await verifyMessage({address:account.address,message:syntheticChallenge,signature:await restoredSign()}),true);
+      const newDeleted=eventOnce(wallet,'session_delete');
+      await waitFor(newProvider.disconnect(),label+' new disconnect');
+      assert.equal((await waitFor(newDeleted,label+' new deletion')).topic,newer.topic);
+      assert.equal(wallet.session.getAll().some(item=>item.topic===newer.topic),false);
+    }
+    await runStorageIsolation(true);
+    await runStorageIsolation(false);
+    phase='same-prefix global core';
+    const firstStorage=new MemoryStorage(),ignoredStorage=new MemoryStorage();
+    const samePrefixOptions={...common,customStoragePrefix:'same-prefix-fixture',disableProviderPing:true,metadata:{name:'Synthetic app',description:'Offline fixture',url:'https://fixture.invalid',icons:[]}};
+    const firstProvider=await waitFor(UniversalProvider.init({...samePrefixOptions,storage:firstStorage}),'same prefix first');
+    clients.push(firstProvider.client);
+    const secondProvider=await waitFor(UniversalProvider.init({...samePrefixOptions,storage:ignoredStorage}),'same prefix second');
+    assert.equal(firstProvider.client.core,secondProvider.client.core);
+    assert.equal(secondProvider.client.core.storage,firstStorage);
+    assert.notEqual(secondProvider.client.core.storage,ignoredStorage);
     await new Promise(resolve=>setTimeout(resolve,30));
     assert.equal(unexpectedRejections.length,0);
-    assert.equal(signatureRequests,1);
+    assert.equal(signatureRequests,6);
     assert.equal(challengeVisibleOnRelay,false);
     assert(pubCount>12);
-    success={status:'passed',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
+    success={status:'passed',sharedStorageIsolation:'unsafe',samePrefixIsolation:'unsafe',separateStorageScope:'synthetic session and signature only',scenarios:['real encrypted pairing, namespace and synthetic signature','missing method rejected by project guard','wrong chain rejected by project guard','late approval still succeeds after abort and both peers clear session','shared storage permits old cleanup to remove new provider state','separate storage retains new provider state during old cleanup','same prefix reuses global core despite a different storage'],relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,blockedTargets:[...blockedTargets]};
   } catch(error) {
-    failure={status:'failed',phase,errorName:error?.name,relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,rpcMethods:[...rpcMethods],blockedTargets:[...blockedTargets]};
+    const diagnostic=String(error?.message||'').replace(/(?:wc:|https?:\/\/)\S+/gi,'[redacted]').replace(/(?:0x)?[a-f0-9]{24,}/gi,'[redacted]').slice(0,180);
+    const walletError=unexpectedRejections.at(-1);
+    const walletDiagnostic=String(walletError?.message||'').replace(/(?:wc:|https?:\/\/)\S+/gi,'[redacted]').replace(/(?:0x)?[a-f0-9]{24,}/gi,'[redacted]').slice(0,180);
+    failure={status:'failed',phase,errorName:error?.name,diagnostic,signatureRequests,signaturesCreated,signatureResponses,walletErrorName:walletError?.name,walletDiagnostic,relayRequests:requestCount,published:pubCount,blockedOutboundAttempts:blockedNetwork,rpcMethods:[...rpcMethods],blockedTargets:[...blockedTargets]};
   } finally {
     try { await shut(); } catch(error) { failure=failure||{status:'failed',phase:'fixture cleanup',errorName:error?.name}; }
   }
