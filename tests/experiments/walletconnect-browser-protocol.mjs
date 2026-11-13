@@ -172,6 +172,7 @@ async function bundleFixture() {
     ["src/lib/walletconnect-storage-codec.ts", "codec.mjs"],
     ["src/lib/walletconnect-ephemeral-storage.ts", "ephemeral.mjs"],
     ["src/lib/walletconnect-session.ts", "session.mjs"],
+    ["src/lib/walletconnect-deeplink-guard.ts", "deeplink-guard.mjs"],
   ]) {
     const input = await readFile(path.join(root, source), "utf8");
     await writeFile(path.join(temp, target), ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText);
@@ -186,6 +187,7 @@ import { createWalletConnectAttemptStorage } from "./indexeddb.mjs";
 import { walletConnectValueStorage } from "./codec.mjs";
 import { createWalletConnectEphemeralStorage } from "./ephemeral.mjs";
 import { walletConnectSessionAllowsSignIn } from "./session.mjs";
+import { withWalletConnectDeepLinkDisabled } from "./deeplink-guard.mjs";
 window.makeScope = createWalletConnectStorageScope;
 window.openEphemeralProvider = async (scope, port) => {
   window.ephemeralStorage = createWalletConnectEphemeralStorage();
@@ -221,6 +223,28 @@ window.startConnect = () => {
 };
 window.sessionAllowed = (address) => walletConnectSessionAllowsSignIn(window.provider.session, address);
 window.signSynthetic = (hexMessage, address) => window.provider.request({method: "personal_sign", params: [hexMessage, address]}, "eip155:1");
+window.startGuardedSignature = (topic, hexMessage, address) => {
+  const provider = window.provider;
+  const client = provider.client;
+  const store = client.session;
+  window.guardSignInvoked = 0;
+  const originalUpdate = store.update;
+  store.update = async (key, patch) => {
+    if (patch.sessionConfig?.disableDeepLink === true) {
+      await originalUpdate.call(store, key, patch);
+      window.guardUpdateApplied = true;
+      await new Promise((resolve) => { window.releaseGuardUpdate = resolve; });
+      return;
+    }
+    return originalUpdate.call(store, key, patch);
+  };
+  window.guardedSignature = withWalletConnectDeepLinkDisabled({
+    topic, address, challenge: hexMessage, isCurrent: () => true,
+    getBinding: () => ({ provider: window.provider, client: window.provider.client, store: window.provider.client.session, providerSession: window.provider.session,
+      chainId: window.provider.rpcProviders.eip155.chainId, account: window.provider.rpcProviders.eip155.requestAccounts()[0] }),
+  }, (request) => { window.guardSignInvoked++; return provider.request(request, "eip155:1"); });
+  window.guardedSignature.catch(() => {});
+};
 window.rawScopeCount = (scope) => new Promise((resolve, reject) => {
   const request = indexedDB.open("imtoken-fans-walletconnect-attempts", 1);
   request.onupgradeneeded = () => { request.transaction.abort(); reject(new Error("Expected attempt database")); };
@@ -239,7 +263,7 @@ window.rawScopeCount = (scope) => new Promise((resolve, reject) => {
   const config = {
     mode: "development", target: "web", context: root, entry: path.join(temp, "fixture.mjs"),
     output: { path: temp, filename: "fixture-bundle.js" }, devtool: false,
-    resolve: { modules: ["node_modules", path.join(root, "node_modules")], fallback: { crypto: false, stream: false, buffer: false, process: false } },
+    resolve: { alias: { "@/lib/walletconnect-session": path.join(temp, "session.mjs") }, modules: ["node_modules", path.join(root, "node_modules")], fallback: { crypto: false, stream: false, buffer: false, process: false } },
     plugins: [new webpack.DefinePlugin({ "process.env.DISABLE_GLOBAL_CORE": JSON.stringify("true") })],
   };
   await new Promise((resolve, reject) => webpack(config, (error, stats) => {
@@ -426,17 +450,7 @@ try {
     accounts: [`eip155:1:${account.address}`], methods: ["personal_sign"], events: ["accountsChanged", "chainChanged"],
   } }, ...(ephemeralDeepLinkMode === "wallet-disabled" ? { sessionConfig: { disableDeepLink: true } } : {}) }), "ephemeral wallet approval");
   const ephemeralTopic = await waitFor(ephemeralPage.evaluate(async () => (await window.sessionPromise).topic), "ephemeral browser session");
-  if (ephemeralDeepLinkMode === "local-disabled") {
-    const unchanged = await ephemeralPage.evaluate(async (topic) => {
-      const sessions = window.provider.client.session;
-      const { sessionConfig: originalConfig, ...originalFields } = sessions.get(topic);
-      await sessions.update(topic, { sessionConfig: { ...originalConfig, disableDeepLink: true } });
-      const { sessionConfig: nextConfig, ...nextFields } = sessions.get(topic);
-      return nextConfig.disableDeepLink === true && JSON.stringify(originalFields) === JSON.stringify(nextFields);
-    }, ephemeralTopic);
-    assert.equal(unchanged, true);
-  }
-  if (ephemeralDeepLinkMode !== "default") {
+  if (ephemeralDeepLinkMode === "wallet-disabled") {
     assert.equal(await ephemeralPage.evaluate((topic) => window.provider.client.session.get(topic).sessionConfig?.disableDeepLink, ephemeralTopic), true);
   }
   await waitFor(ephemeralApproval.acknowledged(), "ephemeral wallet acknowledgement");
@@ -444,6 +458,10 @@ try {
   while (!wallet.session.get(ephemeralTopic)?.acknowledged && Date.now() < ephemeralDeadline) await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(wallet.session.get(ephemeralTopic)?.acknowledged, true);
   if (ephemeralDeepLinkMode === "local-disabled") {
+    await ephemeralPage.evaluate(({ topic, message, address }) => window.startGuardedSignature(topic, message, address), { topic: ephemeralTopic, message: stringToHex(syntheticMessage), address: account.address });
+    await ephemeralPage.waitForFunction(() => window.guardUpdateApplied === true);
+    assert.equal(signatureRequests, 0);
+    assert.equal(await ephemeralPage.evaluate(() => window.guardSignInvoked), 0);
     await ephemeralPage.evaluate(() => {
       window.ephemeralUpdate = new Promise((resolve) => window.provider.once("session_update", (event) => resolve(event.topic)));
     });
@@ -453,11 +471,17 @@ try {
     await waitFor(update.acknowledged(), "ephemeral wallet update acknowledgement");
     assert.equal(await waitFor(ephemeralPage.evaluate(() => window.ephemeralUpdate), "ephemeral session update"), ephemeralTopic);
     assert.equal(await ephemeralPage.evaluate((topic) => window.provider.client.session.get(topic).sessionConfig?.disableDeepLink, ephemeralTopic), true);
+    assert.equal(signatureRequests, 0);
+    assert.equal(await ephemeralPage.evaluate(() => window.guardSignInvoked), 0);
+    await ephemeralPage.evaluate(() => window.releaseGuardUpdate());
   }
   assert.equal(await ephemeralPage.evaluate((address) => window.sessionAllowed(address), account.address), true);
   assert((await ephemeralPage.evaluate(async () => (await window.ephemeralStorage.getKeys()).length)) > 0);
-  const ephemeralSignature = await waitFor(ephemeralPage.evaluate(({ message, address }) => window.signSynthetic(message, address), { message: stringToHex(syntheticMessage), address: account.address }), "ephemeral signature");
+  const ephemeralSignature = ephemeralDeepLinkMode === "local-disabled"
+    ? await waitFor(ephemeralPage.evaluate(() => window.guardedSignature), "guarded ephemeral signature")
+    : await waitFor(ephemeralPage.evaluate(({ message, address }) => window.signSynthetic(message, address), { message: stringToHex(syntheticMessage), address: account.address }), "ephemeral signature");
   assert.equal(await verifyMessage({ address: account.address, message: syntheticMessage, signature: ephemeralSignature }), true);
+  if (ephemeralDeepLinkMode === "local-disabled") assert.equal(await ephemeralPage.evaluate(() => window.guardSignInvoked), 1);
   const ephemeralRemoved = eventOnce(wallet, "session_delete");
   await waitFor(ephemeralPage.evaluate(() => window.provider.disconnect()), "ephemeral disconnect");
   assert.equal((await waitFor(ephemeralRemoved, "ephemeral wallet deletion")).topic, ephemeralTopic);
